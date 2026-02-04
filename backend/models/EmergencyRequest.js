@@ -88,7 +88,6 @@ const EmergencyRequestSchema = new mongoose.Schema({
 // Keep updatedAt in sync for scheduler and analytics
 EmergencyRequestSchema.pre('save', function (next) {
     this.updatedAt = Date.now();
-    next();
 });
 
 module.exports = mongoose.model('EmergencyRequest', EmergencyRequestSchema);

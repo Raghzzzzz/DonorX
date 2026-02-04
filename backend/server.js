@@ -24,6 +24,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request logging middleware (for debugging)
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api/requests')) {
+        logger.info(`${req.method} ${req.path}`, {
+            body: req.body,
+            headers: { authorization: req.headers.authorization ? 'Bearer ***' : 'none' }
+        });
+    }
+    next();
+});
+
 // Database Connection
 const connectDB = async () => {
     try {
@@ -49,6 +60,42 @@ app.use('/api/inventory', inventoryRoutes);
 
 const requestRoutes = require('./routes/requestRoutes');
 app.use('/api/requests', requestRoutes);
+
+// Global Error Handler Middleware (must be after all routes)
+// Must have 4 parameters (err, req, res, next) for Express to recognize it as error handler
+app.use((err, req, res, next) => {
+    // Check if response was already sent
+    if (res.headersSent) {
+        // If headers were sent, delegate to Express default error handler
+        if (typeof next === 'function') {
+            return next(err);
+        }
+        return;
+    }
+
+    logger.error('Unhandled error:', {
+        message: err.message,
+        stack: err.stack,
+        url: req.url,
+        method: req.method,
+        body: req.body
+    });
+    
+    try {
+        res.status(err.status || 500).json({
+            message: err.message || 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
+    } catch (responseError) {
+        // If we can't send response, log it
+        logger.error('Failed to send error response:', responseError);
+    }
+});
+
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).json({ message: 'Route not found' });
+});
 
 // Start Server
 const PORT = process.env.PORT || 5000;
