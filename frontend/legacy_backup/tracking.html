@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Tracking - DonorX</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .map-container {
+            height: 60vh;
+            width: 100%;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .overlay-card {
+            position: absolute;
+            bottom: 2rem;
+            left: 2rem;
+            right: 2rem;
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .overlay-card {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+                bottom: 1rem;
+                left: 1rem;
+                right: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="main-header">
+        <div class="container flex justify-between items-center" style="height: 100%;">
+            <a href="index.html" class="logo">
+                <span style="color: var(--primary-color);">Donor</span><span
+                    style="color: var(--text-primary);">X</span>
+            </a>
+            <div class="flex items-center gap-md">
+                <nav class="nav-links" style="margin-right: 1rem;">
+                    <a href="hospital_dashboard.html">Hospital Dashboard</a>
+                    <a href="dashboard.html">Request Dashboard</a>
+                </nav>
+                <div class="badge badge-critical animate-pulse">Live Emergency Protocol Active</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="padding: 1rem; height: calc(100vh - 80px); display: flex; flex-direction: column;">
+
+        <div id="map" class="map-container"></div>
+
+        <div class="overlay-card animate-fade-in">
+            <div class="flex items-center gap-md">
+                <div style="background: #ECFDF5; padding: 1rem; border-radius: 50%; color: #059669;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 style="margin-bottom: 0.25rem;">Match Confirmed: Stanely Medical</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Transporting <span
+                            id="transportResource" style="font-weight: 600; color: var(--text-primary);">Critical
+                            Resources</span> • ETA: <span style="color: var(--primary-color); font-weight: 700;">8
+                            mins</span></p>
+                </div>
+            </div>
+
+            <div class="flex gap-sm">
+                <button onclick="denyRequest()" class="btn"
+                    style="border: 1px solid var(--border-color); color: var(--danger);">Deny / Cancel</button>
+                <button onclick="completeRequest()" class="btn btn-primary">Mark Delivered</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="js/app.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const CHENNAI_COORDS = [13.0418, 80.2341];
+        const HOSPITAL_COORDS = [13.1075, 80.2878]; // Stanely Medical
+
+        const map = L.map('map').setView([13.07, 80.26], 12);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        // User Marker
+        const userIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div style='background-color:#D32F2F; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'></div>",
+            iconSize: [16, 16]
+        });
+        L.marker(CHENNAI_COORDS, { icon: userIcon }).addTo(map).bindPopup("Patient Location");
+
+        // Init Data
+        const requests = app.getRequests();
+        if (requests.length > 0) {
+            const req = requests[0]; // Latest
+            const span = document.getElementById('transportResource');
+            if (req.resources && req.resources.length > 0) {
+                const names = req.resources.map(r => r.type === 'Blood' ? `Blood (${r.group})` : r.organ).join(', ');
+                span.textContent = names;
+            } else {
+                // Fallback
+                const name = req.organType !== 'None' ? req.organType : `Blood (${req.bloodGroup})`;
+                span.textContent = name;
+            }
+        }
+
+        // Hospital Marker
+        const hospitalIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div style='background-color:#00796B; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'></div>",
+            iconSize: [16, 16]
+        });
+        L.marker(HOSPITAL_COORDS, { icon: hospitalIcon }).addTo(map).bindPopup("Stanely Medical (Source)");
+
+        // Route Line (Mock)
+        const latlngs = [
+            CHENNAI_COORDS,
+            [13.06, 80.25],
+            [13.08, 80.27],
+            HOSPITAL_COORDS
+        ];
+        const routeLine = L.polyline(latlngs, { color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }).addTo(map);
+        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+        // Vehicle Marker
+        const vehicleIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div style='font-size: 24px;'>🚑</div>",
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+        const vehicle = L.marker(HOSPITAL_COORDS, { icon: vehicleIcon }).addTo(map);
+
+        // Simulation Animation
+        let progress = 0;
+        const speed = 0.005;
+
+        function moveVehicle() {
+            if (progress >= 1) return;
+            progress += 0.002;
+
+            // Simple interpolation between Hospital and User (Reverse of latlngs array essentially, sending FROM hospital TO user)
+            // Hospital is at index 3, User at 0.
+            // Let's just interpolate between Hospital and User linearly for MVP simplicity
+            const lat = HOSPITAL_COORDS[0] + (CHENNAI_COORDS[0] - HOSPITAL_COORDS[0]) * progress;
+            const lng = HOSPITAL_COORDS[1] + (CHENNAI_COORDS[1] - HOSPITAL_COORDS[1]) * progress;
+
+            vehicle.setLatLng([lat, lng]);
+            requestAnimationFrame(moveVehicle);
+        }
+
+        setTimeout(moveVehicle, 1000);
+
+        function completeRequest() {
+            if (confirm("Confirm delivery of resources?")) {
+                const requests = app.getRequests();
+                if (requests.length > 0) {
+                    requests[0].status = 'Completed';
+                    localStorage.setItem('donorx_requests', JSON.stringify(requests));
+                    app.addAuditLog('Delivery Completed', `Resources delivered successfully to ${requests[0].patientName}`);
+                }
+                alert("Delivery Confirmed. Protocol Solved.");
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function denyRequest() {
+            if (confirm("Are you sure you want to cancel this emergency protocol?")) {
+                const requests = app.getRequests();
+                if (requests.length > 0) {
+                    requests[0].status = 'Ended';
+                    localStorage.setItem('donorx_requests', JSON.stringify(requests));
+                    app.addAuditLog('Request Cancelled', `User cancelled request for ${requests[0].patientName}`);
+                }
+                window.location.href = 'dashboard.html';
+            }
+        }
+    </script>
+</body>
+
+</html>

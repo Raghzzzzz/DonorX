@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make a Request - DonorX</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+
+<body>
+    <header class="main-header">
+        <div class="container flex justify-between items-center" style="height: 100%;">
+            <a href="index.html" class="logo">
+                <span style="color: var(--primary-color);">Donor</span><span
+                    style="color: var(--text-primary);">X</span>
+            </a>
+            <nav class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="hospital_dashboard.html">Hospital Dashboard</a>
+                <a href="dashboard.html">Request Dashboard</a>
+                <a href="request.html" class="active btn btn-primary" style="padding: 0.5rem 1rem; color: white;">New
+                    Request</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container" style="padding: 4rem 1rem; max-width: 800px;">
+        <div class="card animate-fade-in" style="max-width: 600px; margin: 0 auto;">
+            <div
+                style="margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;">Create Emergency Request</h2>
+                <span id="stepIndicator" class="badge badge-low">Step 1 of 2</span>
+            </div>
+
+            <!-- Emergency Assist Features -->
+            <div style="margin-bottom: 2rem; display: flex; gap: 1rem;">
+                <button type="button" onclick="simulateAssist('Scanning report...')" class="btn"
+                    style="flex: 1; border: 1px dashed var(--primary-color); color: var(--primary-color); background: #FFF5F5;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="vertical-align: middle; margin-right: 0.5rem;">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                        <polyline points="10 9 9 9 8 9" />
+                    </svg>
+                    Upload Medical Report
+                </button>
+                <button type="button" onclick="simulateAssist('Listening...')" class="btn"
+                    style="flex: 1; border: 1px dashed var(--primary-color); color: var(--primary-color); background: #FFF5F5;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="vertical-align: middle; margin-right: 0.5rem;">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                    Voice Assist
+                </button>
+            </div>
+
+            <form id="requestForm">
+                <!-- Step 1: Patient & Condition -->
+                <div id="step1">
+                    <div style="display: grid; gap: 1.5rem;">
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label for="patientName" style="font-weight: 500;">Patient Name</label>
+                            <input type="text" id="patientName" required placeholder="e.g. John Doe"
+                                style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit;">
+                        </div>
+
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label for="conditionType" style="font-weight: 500;">Condition Type</label>
+                            <select id="conditionType" required
+                                style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; background: white;">
+                                <option value="Trauma / Accident">Trauma / Accident</option>
+                                <option value="Surgery">Surgery</option>
+                                <option value="Organ Transplant">Organ Transplant</option>
+                                <option value="Internal Bleeding">Internal Bleeding</option>
+                                <option value="ICU / Critical Care">ICU / Critical Care</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label style="font-weight: 500;">Urgency Level</label>
+                            <div class="flex gap-sm">
+                                <label style="flex: 1; text-align: center;">
+                                    <input type="radio" name="urgency" value="Low" required style="display: none;"
+                                        onchange="updateUrgencyStyle(this)">
+                                    <div class="urgency-btn"
+                                        style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer;">
+                                        Low</div>
+                                </label>
+                                <label style="flex: 1; text-align: center;">
+                                    <input type="radio" name="urgency" value="Medium" style="display: none;"
+                                        onchange="updateUrgencyStyle(this)">
+                                    <div class="urgency-btn"
+                                        style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer;">
+                                        Medium</div>
+                                </label>
+                                <label style="flex: 1; text-align: center;">
+                                    <input type="radio" name="urgency" value="High" style="display: none;"
+                                        onchange="updateUrgencyStyle(this)">
+                                    <div class="urgency-btn"
+                                        style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer;">
+                                        High</div>
+                                </label>
+                                <label style="flex: 1; text-align: center;">
+                                    <input type="radio" name="urgency" value="Critical" style="display: none;"
+                                        onchange="updateUrgencyStyle(this)">
+                                    <div class="urgency-btn"
+                                        style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer;">
+                                        Critical</div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="button" onclick="nextStep()" class="btn btn-primary"
+                            style="margin-top: 1rem; width: 100%;">Next: Resource needed</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Resource Needed -->
+                <div id="step2" style="display: none;">
+                    <div style="display: grid; gap: 1.5rem;">
+
+
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label style="font-weight: 500;">What is needed?</label>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Select
+                                all that apply.</p>
+                            <div class="flex gap-sm">
+                                <label class="resource-checkbox label-blood">
+                                    <input type="checkbox" id="checkBlood" onchange="toggleResource()" checked>
+                                    <span class="custom-check">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path
+                                                d="M12 2.69l5.74 5.74c.97.97 1.46 2.24 1.46 3.61 0 3.03-2.43 5.5-5.5 5.5S8.2 15.07 8.2 12.04c0-1.37.49-2.64 1.46-3.61L12 2.69z" />
+                                        </svg>
+                                        Blood
+                                    </span>
+                                </label>
+                                <label class="resource-checkbox label-organ">
+                                    <input type="checkbox" id="checkOrgan" onchange="toggleResource()">
+                                    <span class="custom-check">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path
+                                                d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z" />
+                                        </svg>
+                                        Organ
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Blood Fields -->
+                        <div id="sectionBlood" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div style="display: grid; gap: 0.5rem;">
+                                <label for="bloodGroup" style="font-weight: 500;">Blood Group</label>
+                                <select id="bloodGroup"
+                                    style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; background: white;">
+                                    <option value="">Select</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                </select>
+                            </div>
+                            <div style="display: grid; gap: 0.5rem;">
+                                <label for="bloodQty" style="font-weight: 500;">Quantity (Units)</label>
+                                <input type="number" id="bloodQty" value="1" min="1"
+                                    style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit;">
+                            </div>
+                        </div>
+
+                        <!-- Organ Fields -->
+                        <div id="sectionOrgan" style="display: none; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div style="display: grid; gap: 0.5rem;">
+                                <label for="organType" style="font-weight: 500;">Organ Type</label>
+                                <select id="organType"
+                                    style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; background: white;">
+                                    <option value="Kidney">Kidney</option>
+                                    <option value="Liver">Liver</option>
+                                    <option value="Heart">Heart</option>
+                                    <option value="Lungs">Lungs</option>
+                                </select>
+                            </div>
+                            <div style="display: grid; gap: 0.5rem;">
+                                <label for="organQty" style="font-weight: 500;">Count</label>
+                                <input type="number" id="organQty" value="1" min="1"
+                                    style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; gap: 0.5rem;">
+                            <label for="location" style="font-weight: 500;">Hospital Location</label>
+                            <input type="text" id="location" required placeholder="e.g. Apollo Hospitals, Greams Road"
+                                style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit;">
+                        </div>
+
+                        <div class="flex gap-sm">
+                            <button type="button" onclick="prevStep()" class="btn btn-secondary"
+                                style="flex: 1;">Back</button>
+                            <button type="submit" class="btn btn-primary" style="flex: 2;">Submit Emergency
+                                Request</button>
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </main>
+
+    <!-- Map Processing Modal (No changes to structure, just referencing id) -->
+    <div id="aiModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px; padding: 1.5rem;">
+            <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <div style="text-align: left;">
+                    <h3 style="margin-bottom: 0.25rem;">Live Search</h3>
+                    <p id="searchStatus" style="color: var(--text-secondary); font-size: 0.9rem;">Initializing
+                        geospatial network...</p>
+                </div>
+                <div id="distanceBadge" class="badge badge-searching" style="transition: all 0.3s;">0 KM Radius</div>
+            </div>
+
+            <div id="map" style="height: 400px; width: 100%; border-radius: 12px; background: #eee;"></div>
+
+            <div style="margin-top: 1rem; text-align: left; font-size: 0.85rem; color: var(--text-secondary);">
+                <div id="logConsole"
+                    style="font-family: monospace; height: 60px; overflow-y: auto; background: #F9FAFB; padding: 0.5rem; border-radius: 6px;">
+                    > System ready...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // UI Logic for Radio Buttons
+        function updateUrgencyStyle(input) {
+            document.querySelectorAll('.urgency-btn').forEach(btn => {
+                btn.style.background = 'white';
+                btn.style.color = 'var(--text-primary)';
+                btn.style.borderColor = 'var(--border-color)';
+                btn.style.fontWeight = 'normal';
+            });
+
+            const label = input.nextElementSibling;
+            label.style.fontWeight = 'bold';
+
+            switch (input.value) {
+                case 'Low':
+                    label.style.background = '#ECFDF5'; label.style.color = '#065F46'; label.style.borderColor = '#10B981'; break;
+                case 'Medium':
+                    label.style.background = '#FFFBEB'; label.style.color = '#92400E'; label.style.borderColor = '#F59E0B'; break;
+                case 'High':
+                    label.style.background = '#FFF7ED'; label.style.color = '#9A3412'; label.style.borderColor = '#F97316'; break;
+                case 'Critical':
+                    label.style.background = '#FEF2F2'; label.style.color = '#991B1B'; label.style.borderColor = '#EF4444'; break;
+            }
+        }
+
+        // Multi-step Logic
+        function nextStep() {
+            const name = document.getElementById('patientName').value;
+            const urgency = document.querySelector('input[name="urgency"]:checked');
+            if (!name || !urgency) {
+                app.showToast('Please fill in Patient Name and Urgency.', 'warning');
+                return;
+            }
+
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('stepIndicator').innerText = 'Step 2 of 2';
+        }
+
+        function prevStep() {
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step1').style.display = 'block';
+            document.getElementById('stepIndicator').innerText = 'Step 1 of 2';
+        }
+
+        // Resource Toggle
+        function toggleResource() {
+            const isBlood = document.getElementById('checkBlood').checked;
+            const isOrgan = document.getElementById('checkOrgan').checked;
+
+            const sectionBlood = document.getElementById('sectionBlood');
+            const sectionOrgan = document.getElementById('sectionOrgan');
+            const labelBlood = document.querySelector('.label-blood');
+            const labelOrgan = document.querySelector('.label-organ');
+
+            if (isBlood) {
+                sectionBlood.style.display = 'grid';
+                labelBlood.classList.add('active');
+            } else {
+                sectionBlood.style.display = 'none';
+                labelBlood.classList.remove('active');
+            }
+
+            if (isOrgan) {
+                sectionOrgan.style.display = 'grid';
+                labelOrgan.classList.add('active');
+            } else {
+                sectionOrgan.style.display = 'none';
+                labelOrgan.classList.remove('active');
+            }
+
+            // Ensure at least one is selected logic if needed, or handle validation on submit
+        }
+
+        // Initialize state
+        toggleResource();
+
+        // Assist Simulation
+        function simulateAssist(msg) {
+            app.showToast(msg, 'info');
+            setTimeout(() => {
+                app.showToast('Data extracted successfully', 'success');
+                document.getElementById('patientName').value = "Deepak Kumar"; // Indian name
+                document.getElementById('conditionType').value = "Trauma / Accident";
+
+                // Select urgency High
+                const highBtn = document.querySelector('input[value="High"]');
+                highBtn.checked = true;
+                updateUrgencyStyle(highBtn);
+            }, 1500);
+        }
+
+        // --- MAP LOGIC ---
+        let map, userMarker, coverageCircle;
+        const CHENNAI_COORDS = [13.0418, 80.2341]; // T. Nagar approx
+
+        // Mock Hospitals in Chennai
+        const HOSPITALS = [
+            { name: "Apollo Hospitals", lat: 13.0632, lng: 80.2523, type: 'network' }, // ~4km
+            { name: "Fortis Malar", lat: 13.0031, lng: 80.2575, type: 'network' }, // ~5km
+            { name: "MIOT International", lat: 13.0270, lng: 80.1855, type: 'network' }, // ~6km
+            { name: "Stanely Medical", lat: 13.1075, lng: 80.2878, type: 'network' }, // ~9km
+            { name: "Billroth Hospitals", lat: 13.0827, lng: 80.2198, type: 'network' } // ~5.5km
+        ];
+
+        function log(msg) {
+            const consoleDiv = document.getElementById('logConsole');
+            consoleDiv.innerHTML += `<div>> ${msg}</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function initMap() {
+            if (map) {
+                map.remove(); // Safely remove previous instance
+                map = null;
+            }
+            map = L.map('map').setView(CHENNAI_COORDS, 13);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // User Icon
+            const userIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div style='background-color:#D32F2F; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);'></div>",
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+
+            // Hospital Icon
+            const hospitalIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div style='background-color:#00796B; width: 10px; height: 10px; border-radius: 50%; opacity: 0.8;'></div>",
+                iconSize: [10, 10],
+                iconAnchor: [5, 5]
+            });
+
+            userMarker = L.marker(CHENNAI_COORDS, { icon: userIcon }).addTo(map)
+                .bindPopup("Your Location: DonorX System").openPopup();
+        }
+
+        async function runSimulation(formData) {
+            const modal = document.getElementById('aiModal');
+            modal.classList.add('active');
+
+            const statusEl = document.getElementById('searchStatus');
+            const badgeEl = document.getElementById('distanceBadge');
+
+            // Wait for modal transition then render map
+            // Increased timeout to 500ms to ensure container is visible
+            setTimeout(() => {
+                initMap();
+                map.invalidateSize();
+
+                // Slight re-center to ensure tiles load
+                setTimeout(() => {
+                    map.setView(CHENNAI_COORDS, 13);
+                    startPhase1(formData);
+                }, 100);
+            }, 500);
+        }
+
+        function startPhase1(formData) {
+            const statusEl = document.getElementById('searchStatus');
+            const badgeEl = document.getElementById('distanceBadge');
+
+            log("Scanning 5km local radius...");
+            badgeEl.innerText = "5 KM Scan";
+
+            // Draw 5km Circle
+            if (coverageCircle) map.removeLayer(coverageCircle);
+            coverageCircle = L.circle(CHENNAI_COORDS, {
+                color: '#D32F2F',
+                fillColor: '#D32F2F',
+                fillOpacity: 0.1,
+                radius: 0
+            }).addTo(map);
+
+            // Animate Circle Growth
+            let r = 0;
+            const grow = setInterval(() => {
+                r += 100;
+                coverageCircle.setRadius(r);
+                if (r >= 5000) {
+                    clearInterval(grow);
+                    log("No immediate matches in 5km zone.");
+                    statusEl.innerText = "Waiting for local response...";
+
+                    // Delay 2 seconds (simulating 5 mins)
+                    setTimeout(() => startPhase2(formData), 2500);
+                }
+            }, 10);
+        }
+
+        function startPhase2(formData) {
+            const statusEl = document.getElementById('searchStatus');
+            const badgeEl = document.getElementById('distanceBadge');
+
+            statusEl.innerText = "Expanding search to 10km grid...";
+            badgeEl.innerText = "10 KM Scan";
+            badgeEl.classList.remove('badge-searching');
+            badgeEl.classList.add('badge-high'); // Change color
+            log("Authority override: Expanding radius.");
+
+            // Animate to 10km
+            let r = 5000;
+            const grow = setInterval(() => {
+                r += 150;
+                coverageCircle.setRadius(r);
+                map.fitBounds(coverageCircle.getBounds());
+
+                if (r >= 10000) {
+                    clearInterval(grow);
+                    showHospitals(formData);
+                }
+            }, 20);
+        }
+
+        function showHospitals(formData) {
+            log("Broadcasting to 5 nearby facilities...");
+
+            const hospitalIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div style='background-color:#00796B; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;'></div>",
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+
+            HOSPITALS.forEach((h, i) => {
+                setTimeout(() => {
+                    L.marker([h.lat, h.lng], { icon: hospitalIcon }).addTo(map)
+                        .bindPopup(`<b>${h.name}</b><br>Checking inventory...`);
+                    log(`Paged: ${h.name}`);
+                }, i * 400);
+            });
+
+            setTimeout(() => {
+                document.getElementById('searchStatus').innerText = "Match Found!";
+                log("Response: Stanely Medical confirms availability.");
+                app.showToast('Match Confirmed: Stanely Medical', 'success');
+
+                // Final calculation delay
+                setTimeout(() => {
+                    const request = app.addRequest(formData);
+                    window.location.href = 'tracking.html';
+                }, 1500);
+            }, 3000);
+        }
+
+
+        // Form Handling
+        document.getElementById('requestForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const isBlood = document.getElementById('checkBlood').checked;
+            const isOrgan = document.getElementById('checkOrgan').checked;
+
+            if (!isBlood && !isOrgan) {
+                app.showToast('Please select at least one resource (Blood or Organ).', 'warning');
+                return;
+            }
+
+            const formData = {
+                patientName: document.getElementById('patientName').value,
+                conditionType: document.getElementById('conditionType').value,
+                urgency: document.querySelector('input[name="urgency"]:checked').value,
+                location: document.getElementById('location').value,
+                resources: []
+            };
+
+            if (isBlood) {
+                formData.resources.push({
+                    type: 'Blood',
+                    group: document.getElementById('bloodGroup').value,
+                    qty: document.getElementById('bloodQty').value
+                });
+            }
+
+            if (isOrgan) {
+                formData.resources.push({
+                    type: 'Organ',
+                    organ: document.getElementById('organType').value,
+                    qty: document.getElementById('organQty').value
+                });
+            }
+
+            // Legacy mapping for backward compatibility with display logic if needed, or update app.js
+            // We will update app.js to handle 'resources' array, but for now map first resource just in case
+            formData.bloodGroup = isBlood ? document.getElementById('bloodGroup').value : 'N/A';
+            formData.organType = isOrgan ? document.getElementById('organType').value : 'None';
+
+            runSimulation(formData);
+        });
+    </script>
+</body>
+
+</html>

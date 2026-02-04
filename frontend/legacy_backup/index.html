@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DonorX - Connecting Lives, Saving Time</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header class="main-header animate-fade-in">
+        <div class="container flex justify-between items-center" style="height: 100%;">
+            <a href="index.html" class="logo">
+                <span style="color: var(--primary-color);">Donor</span><span
+                    style="color: var(--text-primary);">X</span>
+            </a>
+            <nav class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="hospital_dashboard.html">Hospital Dashboard</a>
+                <a href="dashboard.html">Request Dashboard</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="container" style="padding: 6rem 1rem; text-align: center;">
+            <div class="animate-fade-in">
+                <div class="badge badge-low"
+                    style="display: inline-block; margin-bottom: 1rem; color: var(--primary-color); background: rgba(211, 47, 47, 0.1);">
+                    Revolutionizing Healthcare Logistics
+                </div>
+                <h1 style="font-size: 3.5rem; margin-bottom: 1.5rem; letter-spacing: -0.02em;">
+                    Connecting lives, <br>
+                    <span style="color: var(--primary-color);">saving time.</span>
+                </h1>
+                <p style="font-size: 1.25rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto 3rem;">
+                    Delayed access to blood and organs costs lives. DonorX bridges the gap with real-time emergency
+                    coordination, ensuring critical resources reach patients when they matter most.
+                </p>
+                <div class="flex gap-sm justify-center">
+                    <a href="request.html" class="btn btn-primary">Generate Emergency Request</a>
+                    <a href="dashboard.html" class="btn btn-secondary">Request Dashboard</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="container" style="padding: 4rem 1rem 8rem;">
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                <!-- Feature 1 -->
+                <div class="card">
+                    <div
+                        style="width: 48px; height: 48px; background: #FEE2E2; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; color: var(--primary-color);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5 10 10 0 0 0-4.02-2.59A5.021 5.021 0 0 1 12 2Z" />
+                        </svg>
+                    </div>
+                    <h3>AI urgency prioritization</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Our algorithms analyze patient data to calculate accurate urgency scores, ensuring critical
+                        cases get attention first.
+                    </p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="card">
+                    <div
+                        style="width: 48px; height: 48px; background: #D1FAE5; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; color: #059669;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <path
+                                d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3v0a2.9 2.9 0 0 0 1.96 3H22l-2.24.75a2.9 2.9 0 0 0-1.96 3v0a2.9 2.9 0 0 0 1.96 3H22l-2.24.75" />
+                            <path
+                                d="m2 2 2.24.75a2.9 2.9 0 0 1 1.96 3v0a2.9 2.9 0 0 1-1.96 3H2l2.24.75a2.9 2.9 0 0 1 1.96 3v0a2.9 2.9 0 0 1-1.96 3H2l2.24.75" />
+                            <path d="M10 10v4" />
+                            <path d="M14 10v4" />
+                        </svg>
+                    </div>
+                    <h3>Real-time Matching</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Instant geo-based matching connects hospitals with the nearest available blood banks and organ
+                        donors.
+                    </p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="card">
+                    <div
+                        style="width: 48px; height: 48px; background: #DBEAFE; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; color: #2563EB;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <h3>Transparent Audit Trail</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Every action is logged on an immutable ledger, providing complete transparency and
+                        accountability.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer
+        style="background: white; border-top: 1px solid var(--border-color); padding: 2rem 0; text-align: center; color: var(--text-secondary);">
+        <div class="container">
+            <p>&copy; 2024 DonorX Inc. Built for Hackathon.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

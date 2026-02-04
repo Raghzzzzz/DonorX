@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Dashboard - DonorX</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header class="main-header">
+        <div class="container flex justify-between items-center" style="height: 100%;">
+            <a href="index.html" class="logo">
+                <span style="color: var(--primary-color);">Donor</span><span
+                    style="color: var(--text-primary);">X</span>
+            </a>
+            <nav class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="hospital_dashboard.html" class="active">Hospital Dashboard</a>
+                <a href="dashboard.html">Request Dashboard</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container" style="padding: 4rem 1rem;">
+        <div class="flex justify-between items-center" style="margin-bottom: 2rem;">
+            <h2>Hospital Inventory Management</h2>
+            <button class="btn btn-primary" onclick="app.showToast('Add Inventory feature coming soon', 'default')">
+                + Add Resource
+            </button>
+        </div>
+
+        <!-- Inventory Section -->
+        <div class="card animate-fade-in" style="margin-bottom: 2rem;">
+            <div class="flex justify-between items-center" style="margin-bottom: 1rem;">
+                <h3>Current Stock</h3>
+                <div class="flex gap-sm">
+                    <input type="text" id="inventorySearch" placeholder="Search inventory..."
+                        onkeyup="filterInventory()"
+                        style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                    <select id="inventorySort" onchange="sortInventory()"
+                        style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <option value="name">Sort by Name</option>
+                        <option value="qty">Sort by Quantity</option>
+                        <option value="status">Sort by Status</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-container">
+                <table style="font-size: 0.9rem;" id="inventoryTable">
+                    <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th>Type/Group</th>
+                            <th>Quantity</th>
+                            <th>Locker / ID</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Static Data for Prototype -->
+                        <tr>
+                            <td><span style="font-weight: 600;">Kidney</span></td>
+                            <td>Left</td>
+                            <td>1</td>
+                            <td>#6 (Locker 324)</td>
+                            <td><span class="badge badge-low">Available</span></td>
+                            <td><button class="btn-sm" style="color: var(--primary-color);">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td><span style="font-weight: 600;">Kidney</span></td>
+                            <td>Right</td>
+                            <td>0</td>
+                            <td>#6 (Locker 325)</td>
+                            <td><span class="badge badge-critical">Out of Stock</span></td>
+                            <td><button class="btn-sm" style="color: var(--primary-color);">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>Blood</td>
+                            <td>O-</td>
+                            <td>4 Units</td>
+                            <td>Fridge B-12</td>
+                            <td><span class="badge badge-low">Available</span></td>
+                            <td><button class="btn-sm" style="color: var(--primary-color);">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>Blood</td>
+                            <td>A+</td>
+                            <td>2 Units</td>
+                            <td>Fridge A-04</td>
+                            <td><span class="badge badge-warning">Low Stock</span></td>
+                            <td><button class="btn-sm" style="color: var(--primary-color);">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>Blood</td>
+                            <td>B+</td>
+                            <td>8 Units</td>
+                            <td>Fridge B-01</td>
+                            <td><span class="badge badge-low">Available</span></td>
+                            <td><button class="btn-sm" style="color: var(--primary-color);">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>Tissue</td>
+                            <td>Cornea</td>
+                            <td>2 Pairs</td>
+                            <td>Cold Storage C-2</td>
+                            <td><span class="badge badge-low">Available</span></td>
+                            <td><button class="btn-sm" style="color: var(--primary-color);">Edit</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script>
+        function filterInventory() {
+            const input = document.getElementById("inventorySearch");
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById("inventoryTable");
+            const tr = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < tr.length; i++) {
+                let found = false;
+                const tds = tr[i].getElementsByTagName("td");
+                for (let j = 0; j < tds.length; j++) {
+                    if (tds[j]) {
+                        if (tds[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                tr[i].style.display = found ? "" : "none";
+            }
+        }
+
+        function sortInventory() {
+            // Placeholder for sort logic if needed, 
+            // generally simpler to keep static for HTML prototypes unless requested dynamic
+            app.showToast("Sorting updated", "default");
+        }
+    </script>
+</body>
+
+</html>
