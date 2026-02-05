@@ -2,18 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDonor } from '../context/DonorContext';
 import { requestService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-import 'leaflet/dist/leaflet.css';
-// Import separate from map init
-import L from 'leaflet';
 
 const Tracking = () => {
     const { addAuditLog, showToast } = useDonor();
     const navigate = useNavigate();
     const mapContainer = useRef(null);
     const mapInstance = useRef(null);
-    const vehicleMarker = useRef(null);
-    const animationRef = useRef(null);
+    const directionsRendererRef = useRef(null);
     const [activeRequest, setActiveRequest] = useState(null);
+    const [distanceKm, setDistanceKm] = useState(null);
 
     // Initial Data: Default to Chennai if no data
     const [locations, setLocations] = useState({
@@ -58,103 +55,112 @@ const Tracking = () => {
         fetchDeep();
     }, []);
 
+    // Load Google Maps script dynamically
+    const loadGoogleMaps = () => {
+        return new Promise((resolve, reject) => {
+            if (window.google && window.google.maps) {
+                resolve(window.google.maps);
+                return;
+            }
+
+            const existingScript = document.getElementById('google-maps-script');
+            if (existingScript) {
+                existingScript.onload = () => resolve(window.google.maps);
+                existingScript.onerror = reject;
+                return;
+            }
+
+            const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+            if (!apiKey) {
+                console.error('Google Maps API key is missing. Set REACT_APP_GOOGLE_MAPS_API_KEY in your environment.');
+                showToast('Google Maps key missing. Please configure REACT_APP_GOOGLE_MAPS_API_KEY.', 'error');
+                reject(new Error('Missing Google Maps API key'));
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.id = 'google-maps-script';
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve(window.google.maps);
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    };
+
     useEffect(() => {
         if (!mapContainer.current) return;
-        
-        // Remove existing map if it exists
-        if (mapInstance.current) {
-            mapInstance.current.remove();
-            mapInstance.current = null;
-        }
 
-        // Calculate center point between user and hospital
-        const centerLat = (locations.user[0] + locations.hospital[0]) / 2;
-        const centerLng = (locations.user[1] + locations.hospital[1]) / 2;
-        
-        const map = L.map(mapContainer.current).setView([centerLat, centerLng], 12);
-        mapInstance.current = map;
+        let isCancelled = false;
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
-        }).addTo(map);
+        const initGoogleMap = async () => {
+            try {
+                const maps = await loadGoogleMaps();
+                if (isCancelled) return;
 
-        // User Marker (Request Origin)
-        const userIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div style='background-color:#D32F2F; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'></div>",
-            iconSize: [16, 16]
-        });
-        L.marker(locations.user, { icon: userIcon }).addTo(map).bindPopup("Patient/Origin Location");
+                // Calculate center point between user and hospital
+                const centerLat = (locations.user[0] + locations.hospital[0]) / 2;
+                const centerLng = (locations.user[1] + locations.hospital[1]) / 2;
 
-        // Hospital Marker (Source)
-        const hospitalIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div style='background-color:#00796B; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'></div>",
-            iconSize: [16, 16]
-        });
-        L.marker(locations.hospital, { icon: hospitalIcon }).addTo(map).bindPopup("Matched Hospital (Source)");
+                const map = new maps.Map(mapContainer.current, {
+                    center: { lat: centerLat, lng: centerLng },
+                    zoom: 12
+                });
+                mapInstance.current = map;
 
-        // Route Line - shows actual path between coordinates
-        const latlngs = [
-            locations.user,
-            locations.hospital
-        ];
-        const routeLine = L.polyline(latlngs, { color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }).addTo(map);
-        
-        // Calculate distance using Haversine formula (great circle distance)
-        const R = 6371; // Earth's radius in km
-        const dLat = (locations.hospital[0] - locations.user[0]) * Math.PI / 180;
-        const dLon = (locations.hospital[1] - locations.user[1]) * Math.PI / 180;
-        const a = 
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(locations.user[0] * Math.PI / 180) * Math.cos(locations.hospital[0] * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = R * c; // Distance in km
-        
-        routeLine.bindPopup(`Distance: ${distance.toFixed(2)} km`).openPopup();
-        
-        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+                const directionsService = new maps.DirectionsService();
+                const directionsRenderer = new maps.DirectionsRenderer({
+                    map,
+                    suppressMarkers: false
+                });
+                directionsRendererRef.current = directionsRenderer;
 
-        // Vehicle Marker
-        const vehicleIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div style='font-size: 24px;'>🚑</div>",
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        });
-        vehicleMarker.current = L.marker(locations.hospital, { icon: vehicleIcon }).addTo(map);
+                const origin = {
+                    lat: locations.hospital[0],
+                    lng: locations.hospital[1]
+                };
+                const destination = {
+                    lat: locations.user[0],
+                    lng: locations.user[1]
+                };
 
-        // Start Animation
-        startAnimation();
+                directionsService.route(
+                    {
+                        origin,
+                        destination,
+                        travelMode: maps.TravelMode.DRIVING
+                    },
+                    (result, status) => {
+                        if (status === 'OK' && result && result.routes && result.routes[0] && result.routes[0].legs[0]) {
+                            directionsRenderer.setDirections(result);
+                            const leg = result.routes[0].legs[0];
+                            if (leg.distance && typeof leg.distance.value === 'number') {
+                                setDistanceKm(leg.distance.value / 1000);
+                            }
+                        } else {
+                            console.error('Directions request failed due to ' + status);
+                        }
+                    }
+                );
+            } catch (err) {
+                console.error('Failed to initialize Google Maps:', err);
+            }
+        };
+
+        initGoogleMap();
 
         return () => {
+            isCancelled = true;
+            if (directionsRendererRef.current) {
+                directionsRendererRef.current.setMap(null);
+                directionsRendererRef.current = null;
+            }
             if (mapInstance.current) {
-                mapInstance.current.remove();
                 mapInstance.current = null;
             }
-            if (animationRef.current) {
-                cancelAnimationFrame(animationRef.current);
-            }
         };
-    }, [locations]); // Re-run if locations change
-
-    const startAnimation = () => {
-        let progress = 0;
-        const animate = () => {
-            if (progress >= 1) return;
-            progress += 0.002;
-
-            const lat = locations.hospital[0] + (locations.user[0] - locations.hospital[0]) * progress;
-            const lng = locations.hospital[1] + (locations.user[1] - locations.hospital[1]) * progress;
-
-            if (vehicleMarker.current) {
-                vehicleMarker.current.setLatLng([lat, lng]);
-            }
-            animationRef.current = requestAnimationFrame(animate);
-        };
-        setTimeout(animate, 1000);
-    };
+    }, [locations]);
 
     const getResourceDisplay = () => {
         if (!activeRequest || !activeRequest.resourceNeeded) return "Critical Resources";
@@ -229,7 +235,15 @@ const Tracking = () => {
                             Match Confirmed: {activeRequest?.assignedHospital?.name || 'Matched Hospital'}
                         </h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                            Transporting <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{getResourceDisplay()}</span> • ETA: <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>8 mins</span>
+                            Transporting <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{getResourceDisplay()}</span>
+                            {distanceKm !== null && (
+                                <>
+                                    {' • Distance: '}
+                                    <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>
+                                        {distanceKm.toFixed(2)} km
+                                    </span>
+                                </>
+                            )}
                         </p>
                     </div>
                 </div>

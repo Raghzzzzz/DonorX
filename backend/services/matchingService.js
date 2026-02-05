@@ -50,6 +50,16 @@ exports.findMatchingHospitals = async (request) => {
             return !!item;
         });
 
+        // If no inventory-based matches were found, fall back to all hospitals
+        // in radius (excluding the requesting hospital). This ensures that
+        // connected hospitals still see the incoming request for demo / MVP use.
+        if (matchedHospitals.length === 0 && hospitalsInRadius.length > 0) {
+            console.warn(
+                'No hospitals with sufficient inventory found in radius. Falling back to all hospitals in radius for matching.'
+            );
+            return hospitalsInRadius.map(h => h._id);
+        }
+
         return matchedHospitals.map(h => h._id);
     } catch (error) {
         console.error('Error in findMatchingHospitals:', error);
