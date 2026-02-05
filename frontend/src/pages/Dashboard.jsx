@@ -21,7 +21,7 @@ const Dashboard = () => {
     const [selectedAuditId, setSelectedAuditId] = useState(null);
     const [auditLogs, setAuditLogs] = useState([]);
 
-    // Auto-refresh requests periodically
+    // Auto-refresh requests periodically (outgoing + incoming for Request Dashboard)
     useEffect(() => {
         const fetchAll = async () => {
             try {
@@ -29,10 +29,10 @@ const Dashboard = () => {
                     requestService.getMyRequests(),
                     requestService.getIncoming()
                 ]);
-                setOutgoingRequests(myRes.data || []);
-                setIncomingRequests(incRes.data || []);
+                setOutgoingRequests(Array.isArray(myRes.data) ? myRes.data : []);
+                setIncomingRequests(Array.isArray(incRes.data) ? incRes.data : []);
             } catch (e) {
-                console.error(e);
+                console.error('Dashboard fetch error:', e);
             }
         };
 

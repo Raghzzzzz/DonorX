@@ -30,7 +30,7 @@ exports.findMatchingHospitals = async (request) => {
 
         const radiusInRadians = (searchRadius || 5) / 6378.1; // Earth radius in km
 
-        const hospitalsInRadius = await Hospital.find({
+        let hospitalsInRadius = await Hospital.find({
             location: {
                 $geoWithin: {
                     $centerSphere: [coordinates, radiusInRadians]
@@ -38,6 +38,14 @@ exports.findMatchingHospitals = async (request) => {
             },
             _id: { $ne: request.requestingHospital } // Exclude self
         });
+
+        // If no hospitals in radius (e.g. only one hospital in DB, or others too far),
+        // add ALL other hospitals so the second device sees the request in the incoming list (demo/MVP).
+        if (hospitalsInRadius.length === 0) {
+            hospitalsInRadius = await Hospital.find({
+                _id: { $ne: request.requestingHospital }
+            }).select('_id inventory');
+        }
 
         // 2. Filter by Inventory
         const matchedHospitals = hospitalsInRadius.filter(hospital => {
@@ -54,9 +62,6 @@ exports.findMatchingHospitals = async (request) => {
         // in radius (excluding the requesting hospital). This ensures that
         // connected hospitals still see the incoming request for demo / MVP use.
         if (matchedHospitals.length === 0 && hospitalsInRadius.length > 0) {
-            console.warn(
-                'No hospitals with sufficient inventory found in radius. Falling back to all hospitals in radius for matching.'
-            );
             return hospitalsInRadius.map(h => h._id);
         }
 
