@@ -43,13 +43,20 @@ exports.expandSearchRadius = async (requestId) => {
 
 exports.handleAcceptance = async (requestId, hospitalId) => {
     const request = await EmergencyRequest.findById(requestId);
-    if (!request || request.status !== 'Generated') {
-        throw new Error('Request not available for acceptance');
+    if (!request) {
+        throw new Error('Request not found');
+    }
+    
+    if (request.status !== 'Generated') {
+        throw new Error(`Request not available for acceptance. Current status: ${request.status}`);
     }
 
-    // Check if hospital is a match
-    if (!request.potentialMatches.includes(hospitalId)) {
-        throw new Error('Hospital not authorized to accept this request');
+    // Check if hospital is a match - convert both to strings for comparison
+    const hospitalIdStr = hospitalId.toString();
+    const matchesStr = request.potentialMatches.map(m => m.toString());
+    
+    if (!matchesStr.includes(hospitalIdStr)) {
+        throw new Error('Hospital not authorized to accept this request. Hospital not in potential matches.');
     }
 
     const hospital = await Hospital.findById(hospitalId);

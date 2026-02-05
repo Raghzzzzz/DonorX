@@ -8,7 +8,8 @@ const IncomingRequestModal = () => {
     const [request, setRequest] = useState(null);
     const [isOpen, setIsOpen] = useState(false);
     const [inventoryMatch, setInventoryMatch] = useState(null);
-    const { showToast } = useDonor();
+    const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
+    const { showToast, user } = useDonor();
     const navigate = useNavigate();
 
     // Poll for incoming requests
@@ -16,6 +17,26 @@ const IncomingRequestModal = () => {
         const poll = setInterval(checkForRequests, 5000); // 5 seconds polling for demo
         return () => clearInterval(poll);
     }, []);
+
+    // 3-minute timer countdown
+    useEffect(() => {
+        if (!isOpen || !request) return;
+
+        setTimeLeft(180); // Reset to 3 minutes when modal opens
+
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    handleAutoDeny();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isOpen, request]);
 
     const checkForRequests = async () => {
         try {
@@ -56,21 +77,51 @@ const IncomingRequestModal = () => {
         }
     };
 
+    const handleAutoDeny = async () => {
+        if (!request) return;
+        try {
+            await requestService.respond(request._id, 'Deny');
+            showToast('Request auto-denied after 3 minutes', 'warning');
+            setIsOpen(false);
+            setRequest(null);
+        } catch (error) {
+            console.error('Auto-deny error:', error);
+        }
+    };
+
     const handleRespond = async (status) => {
         if (!request) return;
         try {
-            await requestService.respond(request._id, status);
+            console.log('Responding to request:', { requestId: request._id, status, hospitalId: user?._id });
+            const response = await requestService.respond(request._id, status);
+            console.log('Response received:', response.data);
+            
             showToast(status === 'Accept' ? 'Request Accepted! Redirecting...' : 'Request Denied', status === 'Accept' ? 'success' : 'info');
             setIsOpen(false);
             setRequest(null);
+            setTimeLeft(180); // Reset timer
 
             if (status === 'Accept') {
-                // Open Google Maps or Navigate to tracking logic
-                navigate('/hospital-dashboard'); // Or a specific "Active Missions" page
+                // Refresh the page data by triggering a reload or navigate to tracking
+                // The tracking page will fetch the updated request
+                setTimeout(() => {
+                    navigate('/tracking');
+                }, 1000);
+            } else {
+                // If denied, stay on current page but refresh incoming requests
+                // The polling will pick up the change
             }
         } catch (error) {
-            showToast('Failed to respond', 'error');
+            console.error('Failed to respond:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to respond';
+            showToast(`Failed to respond: ${errorMessage}`, 'error');
         }
+    };
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     if (!request) return null;
@@ -96,7 +147,7 @@ const IncomingRequestModal = () => {
                 )}
 
                 <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#666' }}>
-                    Auto-Deny in <span style={{ color: '#D32F2F', fontWeight: 'bold' }}>02:59</span>
+                    Auto-Deny in <span style={{ color: '#D32F2F', fontWeight: 'bold', fontSize: '1.1rem' }}>{formatTime(timeLeft)}</span>
                 </p>
 
                 <div className="flex gap-4">

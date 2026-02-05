@@ -200,9 +200,18 @@ exports.respondToRequest = async (req, res) => {
     const requestId = req.params.id;
 
     try {
+        console.log('Respond to request:', { requestId, response, hospitalId: req.user._id });
+        
         if (response === 'Accept') {
             await handleAcceptance(requestId, req.user._id);
-            res.json({ message: 'Request accepted successfully' });
+            // Fetch updated request to return full details
+            const updatedRequest = await EmergencyRequest.findById(requestId)
+                .populate('assignedHospital', 'name location')
+                .populate('requestingHospital', 'name location');
+            res.json({ 
+                message: 'Request accepted successfully',
+                request: updatedRequest
+            });
         } else {
             // Deny logic: Remove from potentialMatches
             // For MVP simplicity, just log it. Real app would remove visibility.
@@ -210,6 +219,7 @@ exports.respondToRequest = async (req, res) => {
             res.json({ message: 'Request denied' });
         }
     } catch (error) {
+        console.error('Error responding to request:', error);
         res.status(400).json({ message: error.message });
     }
 };

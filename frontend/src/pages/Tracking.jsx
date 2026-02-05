@@ -60,16 +60,25 @@ const Tracking = () => {
 
     useEffect(() => {
         if (!mapContainer.current) return;
-        if (mapInstance.current) return; // Initialize once
+        
+        // Remove existing map if it exists
+        if (mapInstance.current) {
+            mapInstance.current.remove();
+            mapInstance.current = null;
+        }
 
-        const map = L.map(mapContainer.current).setView([13.07, 80.26], 12);
+        // Calculate center point between user and hospital
+        const centerLat = (locations.user[0] + locations.hospital[0]) / 2;
+        const centerLng = (locations.user[1] + locations.hospital[1]) / 2;
+        
+        const map = L.map(mapContainer.current).setView([centerLat, centerLng], 12);
         mapInstance.current = map;
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap &copy; CARTO'
         }).addTo(map);
 
-        // User Marker
+        // User Marker (Request Origin)
         const userIcon = L.divIcon({
             className: 'custom-div-icon',
             html: "<div style='background-color:#D32F2F; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'></div>",
@@ -77,7 +86,7 @@ const Tracking = () => {
         });
         L.marker(locations.user, { icon: userIcon }).addTo(map).bindPopup("Patient/Origin Location");
 
-        // Hospital Marker
+        // Hospital Marker (Source)
         const hospitalIcon = L.divIcon({
             className: 'custom-div-icon',
             html: "<div style='background-color:#00796B; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'></div>",
@@ -85,12 +94,26 @@ const Tracking = () => {
         });
         L.marker(locations.hospital, { icon: hospitalIcon }).addTo(map).bindPopup("Matched Hospital (Source)");
 
-        // Route Line
+        // Route Line - shows actual path between coordinates
         const latlngs = [
             locations.user,
             locations.hospital
         ];
         const routeLine = L.polyline(latlngs, { color: '#3B82F6', weight: 4, opacity: 0.7, dashArray: '10, 10' }).addTo(map);
+        
+        // Calculate distance using Haversine formula (great circle distance)
+        const R = 6371; // Earth's radius in km
+        const dLat = (locations.hospital[0] - locations.user[0]) * Math.PI / 180;
+        const dLon = (locations.hospital[1] - locations.user[1]) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(locations.user[0] * Math.PI / 180) * Math.cos(locations.hospital[0] * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c; // Distance in km
+        
+        routeLine.bindPopup(`Distance: ${distance.toFixed(2)} km`).openPopup();
+        
         map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
 
         // Vehicle Marker
