@@ -37,7 +37,7 @@ const Dashboard = () => {
         };
 
         fetchAll();
-        const interval = setInterval(fetchAll, 10000);
+        const interval = setInterval(fetchAll, 5000);
         return () => clearInterval(interval);
     }, []);
 
@@ -165,19 +165,25 @@ const Dashboard = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {incomingRequests.map(req => (
-                            <tr key={req.id} onClick={() => handleOpenAudit(req.id)} style={{ cursor: 'pointer' }}>
-                                <td style={{ fontFamily: 'monospace', fontWeight: 500 }}>{req.requestId || req._id}</td>
-                                <td style={{ fontWeight: 600 }}>{req.patientName}</td>
-                                <td>
-                                    <div style={{ fontWeight: 500 }}>{req.organType !== 'None' ? 'Organ: ' + req.organType : 'Blood: ' + req.bloodGroup}</div>
+                        {incomingRequests.length === 0 ? (
+                            <tr>
+                                <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                    No incoming requests. Create a request from another hospital to see it here.
                                 </td>
-                                <td>{req.requestingHospital?.name || 'Unknown Hospital'}</td>
-                                <td><span className={`badge ${getUrgencyClass(req.urgency)}`}>{req.urgency}</span></td>
-                                <td><span className={`badge ${getStatusClass(req.status)}`}>{req.status}</span></td>
-                                <td style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{formatDate(req.createdAt)}</td>
                             </tr>
-                        ))}
+                        ) : (
+                            incomingRequests.map(req => (
+                                <tr key={req._id} onClick={() => handleOpenAudit(req._id)} style={{ cursor: 'pointer' }}>
+                                    <td style={{ fontFamily: 'monospace', fontWeight: 500 }}>{req.requestId || req._id}</td>
+                                    <td style={{ fontWeight: 600 }}>{req.patientName}</td>
+                                    <td>{req.resourceNeeded ? `${req.resourceNeeded.type}: ${req.resourceNeeded.group} (x${req.resourceNeeded.quantity})` : '—'}</td>
+                                    <td>{req.requestingHospital?.name || 'Unknown Hospital'}</td>
+                                    <td><span className={`badge ${getUrgencyClass(req.urgency)}`}>{req.urgency}</span></td>
+                                    <td><span className={`badge ${getStatusClass(req.status)}`}>{req.status}</span></td>
+                                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{formatDate(req.createdAt)}</td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -208,7 +214,7 @@ const Dashboard = () => {
                             </tr>
                         ) : (
                             outgoingRequests.map(req => (
-                                <tr key={req.id} onClick={() => handleOpenAudit(req.id)} style={{ cursor: 'pointer' }} title="Click to view Audit Log">
+                                <tr key={req._id} onClick={() => handleOpenAudit(req._id)} style={{ cursor: 'pointer' }} title="Click to view Audit Log">
                                     <td style={{ fontFamily: 'monospace', fontWeight: 500 }}>{req.requestId || req._id}</td>
                                     <td style={{ fontWeight: 600 }}>{req.patientName || 'Anonymous'}</td>
                                     <td>{getResDisplay(req)}</td>

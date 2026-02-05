@@ -125,12 +125,16 @@ exports.createRequest = async (req, res) => {
             resource: resourceNeeded
         }).catch(err => console.error('Audit log error (non-critical):', err));
 
-        // Trigger Workflow (Matching) - Async (non-blocking)
-        processRequestMatching(createdRequest._id).catch(err => {
-            console.error('Matching workflow error (non-critical):', err);
-        });
+        // Run matching before responding so other hospitals see the request in incoming immediately
+        try {
+            await processRequestMatching(createdRequest._id);
+        } catch (matchErr) {
+            console.error('Matching workflow error (non-critical):', matchErr);
+        }
 
-        res.status(201).json(createdRequest);
+        // Refetch so response includes populated potentialMatches if needed
+        const toSend = await EmergencyRequest.findById(createdRequest._id);
+        res.status(201).json(toSend || createdRequest);
     } catch (error) {
         console.error('Error creating request:', error);
         console.error('Error name:', error.name);

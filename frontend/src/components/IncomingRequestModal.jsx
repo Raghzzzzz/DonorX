@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
 import { requestService, inventoryService } from '../services/api';
 import { useDonor } from '../context/DonorContext';
@@ -9,12 +9,50 @@ const IncomingRequestModal = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [inventoryMatch, setInventoryMatch] = useState(null);
     const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
+    const lastShownRequestIdRef = useRef(null);
     const { showToast, user } = useDonor();
     const navigate = useNavigate();
 
-    // Poll for incoming requests
+    const checkForRequests = async () => {
+        try {
+            const { data } = await requestService.getIncoming();
+            if (data && data.length > 0) {
+                const incReq = data[0];
+                if (lastShownRequestIdRef.current !== incReq._id) {
+                    lastShownRequestIdRef.current = incReq._id;
+                    setRequest(incReq);
+                    setIsOpen(true);
+                    checkInventory(incReq);
+                }
+            }
+        } catch (error) {
+            // silent fail
+        }
+    };
+
+    const checkInventory = async (req) => {
+        try {
+            const { data: inventory } = await inventoryService.getInventory();
+            const { type, group, quantity } = req.resourceNeeded;
+
+            const match = inventory && inventory.find(i =>
+                i.type === type && i.group === group && i.quantity >= quantity
+            );
+
+            if (match) {
+                setInventoryMatch(`Available: ${match.quantity} units (Locker #${Math.floor(Math.random() * 100)})`);
+            } else {
+                setInventoryMatch('WARNING: Insufficient Inventory found in system records.');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    // Poll for incoming requests: run immediately, then every 3s so second device sees new requests quickly
     useEffect(() => {
-        const poll = setInterval(checkForRequests, 5000); // 5 seconds polling for demo
+        checkForRequests();
+        const poll = setInterval(checkForRequests, 3000);
         return () => clearInterval(poll);
     }, []);
 
@@ -37,45 +75,6 @@ const IncomingRequestModal = () => {
 
         return () => clearInterval(timer);
     }, [isOpen, request]);
-
-    const checkForRequests = async () => {
-        try {
-            const { data } = await requestService.getIncoming();
-            if (data && data.length > 0) {
-                // Just take the first one for MVP
-                const incReq = data[0]; // Assuming backend returns array of potential matches
-
-                // If we haven't seen this one yet
-                if (!request || request._id !== incReq._id) {
-                    setRequest(incReq);
-                    setIsOpen(true);
-                    checkInventory(incReq);
-                    // Play alert sound?
-                }
-            }
-        } catch (error) {
-            // silent fail
-        }
-    };
-
-    const checkInventory = async (req) => {
-        try {
-            const { data: inventory } = await inventoryService.getInventory();
-            const { type, group, quantity } = req.resourceNeeded;
-
-            const match = inventory.find(i =>
-                i.type === type && i.group === group && i.quantity >= quantity
-            );
-
-            if (match) {
-                setInventoryMatch(`Available: ${match.quantity} units (Locker #${Math.floor(Math.random() * 100)})`);
-            } else {
-                setInventoryMatch('WARNING: Insufficient Inventory found in system records.');
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    };
 
     const handleAutoDeny = async () => {
         if (!request) return;
