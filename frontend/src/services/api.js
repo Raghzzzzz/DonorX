@@ -13,13 +13,15 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const userStr = localStorage.getItem('donorx_user');
-        console.log('[API] Interceptor - Raw User:', userStr); // DEBUG
         if (userStr) {
             const user = JSON.parse(userStr);
-            console.log('[API] Interceptor - Parsed Token:', user?.token ? 'Present' : 'Missing'); // DEBUG
             if (user && user.token) {
                 config.headers.Authorization = `Bearer ${user.token}`;
             }
+        }
+        // FormData must not have Content-Type set - browser sets multipart/form-data with boundary
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
         }
         return config;
     },
@@ -34,6 +36,14 @@ export const authService = {
 export const inventoryService = {
     getInventory: () => api.get('/inventory'),
     updateInventory: (data) => api.put('/inventory', data),
+};
+
+export const assistService = {
+    parseReport: (file) => {
+        const formData = new FormData();
+        formData.append('report', file);
+        return api.post('/assist/parse-report', formData);
+    },
 };
 
 export const requestService = {

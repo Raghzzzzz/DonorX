@@ -61,6 +61,9 @@ app.use('/api/inventory', inventoryRoutes);
 const requestRoutes = require('./routes/requestRoutes');
 app.use('/api/requests', requestRoutes);
 
+const assistRoutes = require('./routes/assistRoutes');
+app.use('/api/assist', assistRoutes);
+
 // Global Error Handler Middleware (must be after all routes)
 // Must have 4 parameters (err, req, res, next) for Express to recognize it as error handler
 app.use((err, req, res, next) => {

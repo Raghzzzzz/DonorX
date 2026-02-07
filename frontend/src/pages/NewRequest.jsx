@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useDonor } from '../context/DonorContext';
-import { requestService } from '../services/api'; // Import API
+import { requestService, assistService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { useVoiceRequest } from '../hooks/useVoiceRequest';
 
 const NewRequest = () => {
     const { showToast } = useDonor();
@@ -33,6 +34,74 @@ const NewRequest = () => {
     const [simStatus, setSimStatus] = useState("Initializing geospatial network...");
     const [simDistance, setSimDistance] = useState("0 KM Radius");
     const [simLogs, setSimLogs] = useState(["> System ready..."]);
+
+    // Voice assist state
+    const [voiceTranscript, setVoiceTranscript] = useState('');
+    const [voiceLanguage, setVoiceLanguage] = useState('en-IN'); // 'en-IN' or 'ta-IN'
+    const fileInputRef = useRef(null);
+
+    const handleVoiceParsed = (parsed, rawTranscript) => {
+        setFormData(prev => {
+            const next = { ...prev };
+            if (parsed.patientName && !next.patientName) next.patientName = parsed.patientName;
+            if (parsed.urgency && !next.urgency) next.urgency = parsed.urgency;
+            if (parsed.conditionType && (next.conditionType === 'Trauma / Accident' || !next.conditionType)) next.conditionType = parsed.conditionType;
+            if (parsed.resourceType === 'blood') {
+                next.bloodGroup = parsed.bloodGroup || next.bloodGroup;
+                next.bloodQty = parsed.quantity || next.bloodQty;
+            } else if (parsed.resourceType === 'organ') {
+                next.organQty = parsed.quantity || next.organQty;
+                if (parsed.organType) next.organType = parsed.organType;
+            }
+            return next;
+        });
+        if (parsed.resourceType === 'blood') setSelectedResources({ blood: true, organ: false });
+        else if (parsed.resourceType === 'organ') setSelectedResources({ blood: false, organ: true });
+        setVoiceTranscript(rawTranscript);
+        showToast('Voice captured – fields updated where possible.', 'success');
+    };
+
+    const {
+        isListening: isVoiceListening,
+        transcript: liveTranscript,
+        startListening,
+        stopListening,
+    } = useVoiceRequest(handleVoiceParsed, { language: voiceLanguage });
+
+    const handleBrowseReport = () => {
+        if (fileInputRef.current) fileInputRef.current.click();
+    };
+
+    const handleReportSelected = (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        showToast(`Scanning report: ${file.name}`, 'info');
+        assistService.parseReport(file)
+            .then(({ data }) => {
+                const parsed = data?.parsed || {};
+                setFormData(prev => {
+                    const next = { ...prev };
+                    if (parsed.patientName && !next.patientName) next.patientName = parsed.patientName;
+                    if (parsed.conditionType && (next.conditionType === 'Trauma / Accident' || !next.conditionType)) next.conditionType = parsed.conditionType;
+                    if (parsed.urgency && !next.urgency) next.urgency = parsed.urgency;
+                    if (parsed.resourceType === 'blood') {
+                        if (parsed.bloodGroup) next.bloodGroup = parsed.bloodGroup;
+                        if (parsed.quantity) next.bloodQty = parsed.quantity;
+                    } else if (parsed.resourceType === 'organ') {
+                        if (parsed.organType) next.organType = parsed.organType;
+                        if (parsed.quantity) next.organQty = parsed.quantity;
+                    }
+                    return next;
+                });
+                if (parsed.resourceType === 'blood') setSelectedResources({ blood: true, organ: false });
+                else if (parsed.resourceType === 'organ') setSelectedResources({ blood: false, organ: true });
+                showToast('Report scanned – details suggested.', 'success');
+            })
+            .catch((error) => {
+                console.error('Failed to parse report', error);
+                showToast('Unable to scan this report file.', 'error');
+            });
+    };
 
     const mapContainer = useRef(null);
     const mapInstance = useRef(null);
@@ -324,16 +393,102 @@ const NewRequest = () => {
                 </div>
 
                 {/* Emergency Assist */}
-                <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem' }}>
-                    <button type="button" onClick={() => simulateAssist('Scanning report...')} className="btn"
-                        style={{ flex: 1, border: '1px dashed var(--primary-color)', color: 'var(--primary-color)', background: '#FFF5F5' }}>
-                        Upload Medical Report
-                    </button>
-                    <button type="button" onClick={() => simulateAssist('Listening...')} className="btn"
-                        style={{ flex: 1, border: '1px dashed var(--primary-color)', color: 'var(--primary-color)', background: '#FFF5F5' }}>
-                        Voice Assist
-                    </button>
+                <div style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => setVoiceLanguage('en-IN')}
+                            className="btn"
+                            style={{
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.8rem',
+                                borderRadius: '999px',
+                                border: voiceLanguage === 'en-IN' ? '1px solid var(--primary-color)' : '1px solid #e5e7eb',
+                                background: voiceLanguage === 'en-IN' ? '#EFF6FF' : '#ffffff',
+                                color: voiceLanguage === 'en-IN' ? 'var(--primary-color)' : '#4b5563'
+                            }}
+                        >
+                            English
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setVoiceLanguage('ta-IN')}
+                            className="btn"
+                            style={{
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.8rem',
+                                borderRadius: '999px',
+                                border: voiceLanguage === 'ta-IN' ? '1px solid var(--primary-color)' : '1px solid #e5e7eb',
+                                background: voiceLanguage === 'ta-IN' ? '#EFF6FF' : '#ffffff',
+                                color: voiceLanguage === 'ta-IN' ? 'var(--primary-color)' : '#4b5563'
+                            }}
+                        >
+                            தமிழ்
+                        </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            type="button"
+                            onClick={handleBrowseReport}
+                            className="btn"
+                            style={{ flex: 1, border: '1px dashed var(--primary-color)', color: 'var(--primary-color)', background: '#FFF5F5' }}
+                        >
+                            Upload Medical Report
+                        </button>
+                        <button
+                            type="button"
+                            onClick={isVoiceListening ? stopListening : startListening}
+                            className="btn"
+                            style={{
+                                flex: 1,
+                                border: '1px dashed var(--primary-color)',
+                                color: isVoiceListening ? '#B91C1C' : 'var(--primary-color)',
+                                background: isVoiceListening ? '#FEE2E2' : '#FFF5F5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            <span
+                                style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '999px',
+                                    border: isVoiceListening ? '6px solid #DC2626' : '2px solid var(--primary-color)',
+                                    boxShadow: isVoiceListening ? '0 0 0 4px rgba(220,38,38,0.35)' : 'none',
+                                    transition: 'all 0.2s ease-out'
+                                }}
+                            />
+                            <span>{isVoiceListening ? 'Tap to stop listening' : 'Tap to speak'}</span>
+                        </button>
+                    </div>
+
+                    {(voiceTranscript || liveTranscript) && (
+                        <div
+                            style={{
+                                fontSize: '0.85rem',
+                                color: 'var(--text-secondary)',
+                                background: '#F9FAFB',
+                                borderRadius: '8px',
+                                padding: '0.5rem 0.75rem',
+                                border: '1px dashed #E5E7EB'
+                            }}
+                        >
+                            <strong>Heard:</strong>{' '}
+                            <span>{liveTranscript || voiceTranscript}</span>
+                        </div>
+                    )}
                 </div>
+
+                <input
+                    type="file"
+                    accept="*/*"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleReportSelected}
+                />
 
                 <form onSubmit={handleSubmit}>
                     {step === 1 ? (
