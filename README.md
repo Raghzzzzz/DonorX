@@ -2,9 +2,6 @@
 
 > **Real-time emergency blood & organ matching platform for hospitals — powered by AI, geospatial routing, and cryptographic audit trails.**
 
-[![Google Solution Challenge](https://img.shields.io/badge/Google%20Solution%20Challenge-2026-4285F4?style=for-the-badge&logo=google)](https://developers.google.com/community/gdsc-solution-challenge)
-[![SDG 3](https://img.shields.io/badge/SDG%203-Good%20Health%20%26%20Well--Being-4CAF50?style=for-the-badge)](https://sdgs.un.org/goals/goal3)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 ---
 
