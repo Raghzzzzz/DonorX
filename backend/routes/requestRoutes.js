@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
     createRequest,
+    getRequestById,
     getMyRequests,
     getIncomingRequests,
     respondToRequest,
@@ -13,6 +14,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 router.post('/', protect, asyncHandler(createRequest));
 router.get('/my', protect, asyncHandler(getMyRequests));
 router.get('/incoming', protect, asyncHandler(getIncomingRequests));
+router.get('/:id', protect, asyncHandler(getRequestById));
 router.post('/:id/respond', protect, asyncHandler(respondToRequest));
 router.put('/:id/status', protect, asyncHandler(updateRequestStatus));
 

@@ -1,47 +1,67 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDonor } from '../context/DonorContext';
-import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { requestService } from '../services/api';
+import { getSocket } from '../services/socket';
 
 const Dashboard = () => {
     const { getAuditLogsForRequest, showToast, formatDate } = useDonor();
-    const navigate = useNavigate();
 
-    // Backend-backed requests
     const [outgoingRequests, setOutgoingRequests] = useState([]);
     const [incomingRequests, setIncomingRequests] = useState([]);
 
-    // Stats
     const activeRequests = outgoingRequests.length;
     const criticalRequests = outgoingRequests.filter(r => r.urgency === 'Critical' || r.urgency === 'High').length;
 
-    // Audit Modal State
     const [isAuditOpen, setAuditOpen] = useState(false);
     const [selectedAuditId, setSelectedAuditId] = useState(null);
     const [auditLogs, setAuditLogs] = useState([]);
 
-    // Auto-refresh requests periodically (outgoing + incoming for Request Dashboard)
-    useEffect(() => {
-        const fetchAll = async () => {
-            try {
-                const [myRes, incRes] = await Promise.all([
-                    requestService.getMyRequests(),
-                    requestService.getIncoming()
-                ]);
-                setOutgoingRequests(Array.isArray(myRes.data) ? myRes.data : []);
-                setIncomingRequests(Array.isArray(incRes.data) ? incRes.data : []);
-            } catch (e) {
-                console.error('Dashboard fetch error:', e);
-            }
-        };
-
-        fetchAll();
-        const interval = setInterval(fetchAll, 5000);
-        return () => clearInterval(interval);
+    const fetchAll = useCallback(async () => {
+        try {
+            const [myRes, incRes] = await Promise.all([
+                requestService.getMyRequests(),
+                requestService.getIncoming()
+            ]);
+            setOutgoingRequests(Array.isArray(myRes.data) ? myRes.data : []);
+            setIncomingRequests(Array.isArray(incRes.data) ? incRes.data : []);
+        } catch (e) {
+            console.error('Dashboard fetch error:', e);
+        }
     }, []);
 
-    // Auto-scroll for Audit Modal
+    useEffect(() => {
+        fetchAll();
+
+        const socket = getSocket();
+
+        const onNewRequest = (request) => {
+            setIncomingRequests((prev) => {
+                const exists = prev.some((r) => r._id === request._id);
+                if (exists) {
+                    return prev.map((r) => (r._id === request._id ? request : r));
+                }
+                return [request, ...prev];
+            });
+            showToast(`New emergency request: ${request.patientName}`, 'warning');
+        };
+
+        const onRequestAccepted = (request) => {
+            setOutgoingRequests((prev) =>
+                prev.map((r) => (r._id === request._id ? request : r))
+            );
+            showToast('Your request was accepted!', 'success');
+        };
+
+        socket.on('new_request', onNewRequest);
+        socket.on('request_accepted', onRequestAccepted);
+
+        return () => {
+            socket.off('new_request', onNewRequest);
+            socket.off('request_accepted', onRequestAccepted);
+        };
+    }, [fetchAll, showToast]);
+
     const timelineRef = useRef(null);
     const outgoingRef = useRef(null);
 
@@ -133,7 +153,6 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Incoming Requests */}
             <div className="flex justify-between items-center" style={{ marginBottom: '1rem' }}>
                 <h3 style={{ margin: 0 }}>Incoming Requests (Other Hospitals)</h3>
                 <button
@@ -188,7 +207,6 @@ const Dashboard = () => {
                 </table>
             </div>
 
-            {/* Outgoing Requests */}
             <div ref={outgoingRef} className="card table-container animate-fade-in" style={{ padding: 0 }}>
                 <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                     <h3 style={{ margin: 0 }}>Outgoing Requests</h3>
@@ -229,7 +247,6 @@ const Dashboard = () => {
                 </table>
             </div>
 
-            {/* Audit Modal */}
             <Modal isOpen={isAuditOpen} onClose={() => setAuditOpen(false)} maxWidth="800px">
                 <div className="flex justify-between items-center"
                     style={{ marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', textAlign: 'left' }}>
@@ -258,8 +275,6 @@ const Dashboard = () => {
                     ))}
                 </div>
             </Modal>
-
-            {/* Incoming Request Alert Modal removed: real-time alerts handled by global IncomingRequestModal */}
         </div>
     );
 };

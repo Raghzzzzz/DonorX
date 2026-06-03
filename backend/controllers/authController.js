@@ -1,5 +1,6 @@
 const Hospital = require('../models/Hospital');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -7,12 +8,32 @@ const generateToken = (id) => {
     });
 };
 
+const registerValidation = [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('location.lat').isNumeric().withMessage('location.lat must be a number'),
+    body('location.lon').isNumeric().withMessage('location.lon must be a number'),
+];
+
+const loginValidation = [
+    body('email').notEmpty().withMessage('Email is required'),
+    body('password').notEmpty().withMessage('Password is required'),
+];
+
 // @desc    Register a new hospital
 // @route   POST /api/auth/register
 // @access  Public
 exports.registerHospital = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            message: errors.array()[0].msg,
+            errors: errors.array(),
+        });
+    }
+
     const { name, email, password, location } = req.body;
-    // location expect: { lat: Number, lon: Number }
 
     try {
         const hospitalExists = await Hospital.findOne({ email });
@@ -27,17 +48,22 @@ exports.registerHospital = async (req, res) => {
             password,
             location: {
                 type: 'Point',
-                coordinates: [location.lon, location.lat]
+                coordinates: [location.lon, location.lat],
             },
-            // Pre-allocate some demo inventory so dashboards are never empty
             inventory: [
                 { type: 'BLOOD', group: 'O+', quantity: 10 },
                 { type: 'BLOOD', group: 'O-', quantity: 4 },
                 { type: 'BLOOD', group: 'A+', quantity: 6 },
                 { type: 'BLOOD', group: 'B+', quantity: 5 },
                 { type: 'ORGAN', group: 'Kidney', quantity: 1 },
-                { type: 'ORGAN', group: 'Liver', quantity: 1 }
-            ]
+                { type: 'ORGAN', group: 'Liver', quantity: 1 },
+            ],
+            resources: [
+                { resourceType: 'ICU_BED', available: 5, total: 10 },
+                { resourceType: 'VENTILATOR', available: 3, total: 6 },
+                { resourceType: 'OXYGEN_CYLINDER', available: 20, total: 30 },
+                { resourceType: 'AMBULANCE', available: 2, total: 4 },
+            ],
         });
 
         if (hospital) {
@@ -60,6 +86,14 @@ exports.registerHospital = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 exports.loginHospital = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            message: errors.array()[0].msg,
+            errors: errors.array(),
+        });
+    }
+
     const { email, password } = req.body;
 
     try {
@@ -80,3 +114,6 @@ exports.loginHospital = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+exports.registerValidation = registerValidation;
+exports.loginValidation = loginValidation;

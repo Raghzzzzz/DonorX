@@ -13,7 +13,7 @@ const Login = () => {
     const location = useLocation();
 
     // Redirect to the page they tried to visit or dashboard
-    const from = location.state?.from?.pathname || '/dashboard';
+    const from = location.state?.from?.pathname || '/command-center';
 
     const handleChange = (e) => {
         const { name, value } = e.target;

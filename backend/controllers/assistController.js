@@ -1,4 +1,39 @@
 const asyncHandler = require('../middleware/asyncHandler');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const generateClinicalSupport = async (reportText) => {
+    try {
+        if (!process.env.GEMINI_API_KEY || !reportText?.trim()) return null;
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const prompt =
+            `You are a clinical decision support assistant helping hospital staff in India.\n` +
+            `Based on this medical report text, provide:\n` +
+            `1. Top 3 possible conditions (be concise, one line each)\n` +
+            `2. Recommended immediate tests (max 3)\n` +
+            `3. Risk level: Low / Medium / High / Critical\n` +
+            `4. One-line clinical note for the receiving doctor\n\n` +
+            `Format your response as JSON only, no markdown, no explanation:\n` +
+            `{\n` +
+            `  "possibleConditions": ["...", "...", "..."],\n` +
+            `  "recommendedTests": ["...", "...", "..."],\n` +
+            `  "riskLevel": "High",\n` +
+            `  "clinicalNote": "..."\n` +
+            `}\n\n` +
+            `Report text: ${reportText}`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return null;
+        return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+        console.error('Gemini clinical support error:', error);
+        return null;
+    }
+};
 
 // Extract value from structured label (e.g. "Patient Name: John Doe" or "Blood Group : O+")
 const extractLabelValue = (text, labels) => {
@@ -209,18 +244,21 @@ exports.parseReport = asyncHandler(async (req, res) => {
 
     const ext = (req.file.originalname || '').split('.').pop().toLowerCase();
 
+    const respondWithParsed = async (text) => {
+        const parsed = parseReportText(text);
+        const clinicalSupport = await generateClinicalSupport(text);
+        return res.status(200).json({ parsed, clinicalSupport });
+    };
+
     if (ext === 'txt') {
         const text = req.file.buffer.toString('utf8');
-        const parsed = parseReportText(text);
-        return res.status(200).json({ parsed });
+        return respondWithParsed(text);
     }
 
-    // For other text-based formats, try parsing as UTF-8 text
     try {
         const text = req.file.buffer.toString('utf8');
         if (text && text.trim().length > 0) {
-            const parsed = parseReportText(text);
-            return res.status(200).json({ parsed });
+            return respondWithParsed(text);
         }
     } catch (err) {
         // Fall through to unsupported

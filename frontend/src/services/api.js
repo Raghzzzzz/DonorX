@@ -46,7 +46,25 @@ export const assistService = {
     },
 };
 
+export const statsService = {
+    getStats: () => api.get('/stats'),
+};
+
+export const auditService = {
+    getLogs: () => api.get('/audit'),
+};
+
+export const resourceService = {
+    getResources: () => api.get('/resources'),
+    updateResource: (data) => api.put('/resources', data),
+};
+
+export const hospitalService = {
+    getNetwork: () => api.get('/hospitals/network'),
+};
+
 export const requestService = {
+    getById: (id) => api.get(`/requests/${id}`),
     create: (data) => api.post('/requests', data),
     getMyRequests: () => api.get('/requests/my'),
     getIncoming: () => api.get('/requests/incoming'),

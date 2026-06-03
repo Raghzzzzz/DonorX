@@ -1,15 +1,67 @@
 const Hospital = require('../models/Hospital');
 
+const compatibility = {
+    'O-': ['O-'],
+    'O+': ['O-', 'O+'],
+    'A-': ['O-', 'A-'],
+    'A+': ['O-', 'O+', 'A-', 'A+'],
+    'B-': ['O-', 'B-'],
+    'B+': ['O-', 'O+', 'B-', 'B+'],
+    'AB-': ['O-', 'A-', 'B-', 'AB-'],
+    'AB+': ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'],
+};
+
+const RESOURCE_TYPES = ['ICU_BED', 'VENTILATOR', 'OXYGEN_CYLINDER', 'AMBULANCE'];
+
+const getResourceCategory = (resourceNeeded) => {
+    if (resourceNeeded.resourceCategory) return resourceNeeded.resourceCategory;
+    if (RESOURCE_TYPES.includes(resourceNeeded.type)) return 'RESOURCE';
+    if (resourceNeeded.type === 'ORGAN') return 'ORGAN';
+    return 'BLOOD';
+};
+
+const isInventoryMatch = (hospital, resourceNeeded) => {
+    const category = getResourceCategory(resourceNeeded);
+
+    if (category === 'RESOURCE') {
+        if (!hospital.resources || !Array.isArray(hospital.resources)) return false;
+        const item = hospital.resources.find(
+            (r) => r.resourceType === resourceNeeded.type && r.available >= resourceNeeded.quantity
+        );
+        return !!item;
+    }
+
+    if (!hospital.inventory || !Array.isArray(hospital.inventory)) return false;
+
+    return hospital.inventory.some((item) => {
+        if (item.type !== resourceNeeded.type || item.quantity < resourceNeeded.quantity) {
+            return false;
+        }
+
+        if (resourceNeeded.type === 'BLOOD') {
+            const compatibleGroups = compatibility[resourceNeeded.group] || [resourceNeeded.group];
+            return compatibleGroups.includes(item.group);
+        }
+
+        return item.group === resourceNeeded.group;
+    });
+};
+
 exports.findMatchingHospitals = async (request) => {
     try {
         const { resourceNeeded, searchRadius = 5 } = request;
 
-        if (!resourceNeeded || !resourceNeeded.type || !resourceNeeded.group) {
+        if (!resourceNeeded || !resourceNeeded.type) {
             console.warn('Invalid resourceNeeded in findMatchingHospitals');
             return [];
         }
 
-        // We need the requesting hospital to get the location if request specific location is missing
+        const category = getResourceCategory(resourceNeeded);
+        if (category !== 'RESOURCE' && !resourceNeeded.group) {
+            console.warn('Invalid resourceNeeded.group in findMatchingHospitals');
+            return [];
+        }
+
         let coordinates;
 
         if (request.location && request.location.coordinates && request.location.coordinates.length === 2) {
@@ -28,46 +80,38 @@ exports.findMatchingHospitals = async (request) => {
             return [];
         }
 
-        const radiusInRadians = (searchRadius || 5) / 6378.1; // Earth radius in km
+        const radiusInRadians = (searchRadius || 5) / 6378.1;
 
         let hospitalsInRadius = await Hospital.find({
             location: {
                 $geoWithin: {
-                    $centerSphere: [coordinates, radiusInRadians]
-                }
+                    $centerSphere: [coordinates, radiusInRadians],
+                },
             },
-            _id: { $ne: request.requestingHospital } // Exclude self
-        });
+            _id: { $ne: request.requestingHospital },
+        }).select('_id inventory resources location name');
 
-        // If no hospitals in radius (e.g. only one hospital in DB, or others too far),
-        // add ALL other hospitals so the second device sees the request in the incoming list (demo/MVP).
         if (hospitalsInRadius.length === 0) {
             hospitalsInRadius = await Hospital.find({
-                _id: { $ne: request.requestingHospital }
-            }).select('_id inventory');
+                _id: { $ne: request.requestingHospital },
+            }).select('_id inventory resources location name');
         }
 
-        // 2. Filter by Inventory
-        const matchedHospitals = hospitalsInRadius.filter(hospital => {
-            if (!hospital.inventory || !Array.isArray(hospital.inventory)) return false;
-            const item = hospital.inventory.find(i =>
-                i.type === resourceNeeded.type &&
-                i.group === resourceNeeded.group &&
-                i.quantity >= resourceNeeded.quantity
-            );
-            return !!item;
-        });
+        const matchedHospitals = hospitalsInRadius.filter((hospital) =>
+            isInventoryMatch(hospital, resourceNeeded)
+        );
 
-        // If no inventory-based matches were found, fall back to all hospitals
-        // in radius (excluding the requesting hospital). This ensures that
-        // connected hospitals still see the incoming request for demo / MVP use.
         if (matchedHospitals.length === 0 && hospitalsInRadius.length > 0) {
-            return hospitalsInRadius.map(h => h._id);
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('DEMO MODE: returning all hospitals — not for production');
+                return hospitalsInRadius.map((h) => h._id);
+            }
+            return [];
         }
 
-        return matchedHospitals.map(h => h._id);
+        return matchedHospitals.map((h) => h._id);
     } catch (error) {
         console.error('Error in findMatchingHospitals:', error);
-        return []; // Return empty array on error, don't fail the request
+        return [];
     }
 };

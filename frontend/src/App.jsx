@@ -10,6 +10,8 @@ import Audit from './pages/Audit';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import CommandCenter from './pages/CommandCenter';
+import HospitalDirectory from './pages/HospitalDirectory';
 import { DonorProvider, useDonor } from './context/DonorContext';
 
 const ProtectedRoute = ({ children }) => {
@@ -34,9 +36,19 @@ function App() {
                         <Route path="register" element={<Register />} />
 
                         {/* Protected Routes */}
+                        <Route path="command-center" element={
+                            <ProtectedRoute>
+                                <CommandCenter />
+                            </ProtectedRoute>
+                        } />
                         <Route path="dashboard" element={
                             <ProtectedRoute>
                                 <Dashboard />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="directory" element={
+                            <ProtectedRoute>
+                                <HospitalDirectory />
                             </ProtectedRoute>
                         } />
                         <Route path="hospital-dashboard" element={

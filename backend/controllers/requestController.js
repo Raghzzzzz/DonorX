@@ -4,8 +4,36 @@ const { createAuditLog } = require('../services/auditService');
 const {
     processRequestMatching,
     handleAcceptance,
-    updateLifecycle
+    updateLifecycle,
+    notifyMatchedHospitals,
 } = require('../services/workflowService');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const generateAISummary = async (request) => {
+    try {
+        if (!process.env.GEMINI_API_KEY) return '';
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const rn = request.resourceNeeded;
+        const needDesc =
+            rn.resourceCategory === 'RESOURCE' || ['ICU_BED', 'VENTILATOR', 'OXYGEN_CYLINDER', 'AMBULANCE'].includes(rn.type)
+                ? `${rn.quantity} x ${rn.type.replace(/_/g, ' ')}`
+                : `${rn.quantity} units of ${rn.group || ''} ${rn.type}`.trim();
+
+        const prompt =
+            `You are a medical triage assistant. In exactly 2 sentences, summarize this emergency for the receiving hospital: ` +
+            `Patient: ${request.patientName}, Condition: ${request.condition}, Urgency: ${request.urgency}, ` +
+            `Needs: ${needDesc}. Be clinical and direct.`;
+
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        console.error('Gemini AI summary error:', error);
+        return '';
+    }
+};
 
 // @desc    Create new emergency request
 // @route   POST /api/requests
@@ -39,15 +67,27 @@ exports.createRequest = async (req, res) => {
             });
         }
 
-        if (!resourceNeeded.type || !['BLOOD', 'ORGAN'].includes(resourceNeeded.type)) {
-            return res.status(400).json({ 
-                message: 'Invalid resourceNeeded.type: must be BLOOD or ORGAN' 
-            });
-        }
+        const RESOURCE_TYPES = ['ICU_BED', 'VENTILATOR', 'OXYGEN_CYLINDER', 'AMBULANCE'];
+        const category = resourceNeeded.resourceCategory || resourceNeeded.type;
 
-        if (!resourceNeeded.group || typeof resourceNeeded.group !== 'string') {
-            return res.status(400).json({ 
-                message: 'Invalid resourceNeeded.group: must be a string (e.g., A+, O-, Kidney)' 
+        if (category === 'RESOURCE' || RESOURCE_TYPES.includes(resourceNeeded.type)) {
+            if (!RESOURCE_TYPES.includes(resourceNeeded.type)) {
+                return res.status(400).json({
+                    message: 'Invalid resource type. Must be ICU_BED, VENTILATOR, OXYGEN_CYLINDER, or AMBULANCE',
+                });
+            }
+            resourceNeeded.resourceCategory = 'RESOURCE';
+            resourceNeeded.group = resourceNeeded.group || '';
+        } else if (resourceNeeded.type === 'BLOOD' || resourceNeeded.type === 'ORGAN') {
+            resourceNeeded.resourceCategory = resourceNeeded.type;
+            if (!resourceNeeded.group || typeof resourceNeeded.group !== 'string') {
+                return res.status(400).json({
+                    message: 'Invalid resourceNeeded.group: must be a string (e.g., A+, O-, Kidney)',
+                });
+            }
+        } else {
+            return res.status(400).json({
+                message: 'Invalid resourceNeeded.type: must be BLOOD, ORGAN, or a resource type (ICU_BED, etc.)',
             });
         }
 
@@ -132,8 +172,21 @@ exports.createRequest = async (req, res) => {
             console.error('Matching workflow error (non-critical):', matchErr);
         }
 
+        // Generate AI triage summary (non-blocking on failure)
+        try {
+            const summary = await generateAISummary(createdRequest);
+            if (summary) {
+                createdRequest.aiSummary = summary;
+                await createdRequest.save();
+                await notifyMatchedHospitals(createdRequest._id);
+            }
+        } catch (aiErr) {
+            console.error('AI summary save error (non-critical):', aiErr);
+        }
+
         // Refetch so response includes populated potentialMatches if needed
-        const toSend = await EmergencyRequest.findById(createdRequest._id);
+        const toSend = await EmergencyRequest.findById(createdRequest._id)
+            .populate('potentialMatches', 'name location');
         res.status(201).json(toSend || createdRequest);
     } catch (error) {
         console.error('Error creating request:', error);
@@ -162,6 +215,26 @@ exports.createRequest = async (req, res) => {
             message: error.message || 'Failed to create request',
             error: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
+    }
+};
+
+// @desc    Get single request by ID
+// @route   GET /api/requests/:id
+// @access  Private
+exports.getRequestById = async (req, res) => {
+    try {
+        const request = await EmergencyRequest.findById(req.params.id)
+            .populate('potentialMatches', 'name location')
+            .populate('requestingHospital', 'name location')
+            .populate('assignedHospital', 'name location');
+
+        if (!request) {
+            return res.status(404).json({ message: 'Request not found' });
+        }
+
+        res.json(request);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 

@@ -1,6 +1,22 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const HospitalResourceSchema = new mongoose.Schema({
+    resourceType: {
+        type: String,
+        enum: ['ICU_BED', 'VENTILATOR', 'OXYGEN_CYLINDER', 'AMBULANCE'],
+        required: true,
+    },
+    available: {
+        type: Number,
+        default: 0,
+    },
+    total: {
+        type: Number,
+        default: 0,
+    },
+});
+
 const InventoryItemSchema = new mongoose.Schema({
     type: {
         type: String,
@@ -49,6 +65,7 @@ const HospitalSchema = new mongoose.Schema({
         }
     },
     inventory: [InventoryItemSchema],
+    resources: [HospitalResourceSchema],
     createdAt: {
         type: Date,
         default: Date.now
@@ -66,7 +83,7 @@ HospitalSchema.methods.matchPassword = async function (enteredPassword) {
 // Encrypt password using bcrypt
 HospitalSchema.pre('save', async function (next) {
     if (!this.isModified('password')) {
-        
+        return next();
     }
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);

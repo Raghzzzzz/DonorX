@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/api';
+import { joinHospitalRoom, disconnectSocket } from '../services/socket';
 
 const DonorContext = createContext();
 
@@ -14,7 +15,11 @@ export const DonorProvider = ({ children }) => {
 
         if (storedUser) {
             try {
-                setUser(JSON.parse(storedUser));
+                const parsed = JSON.parse(storedUser);
+                setUser(parsed);
+                if (parsed._id) {
+                    joinHospitalRoom(parsed._id);
+                }
             } catch (e) {
                 console.error("Failed to parse user", e);
                 localStorage.removeItem('donorx_user');
@@ -40,6 +45,9 @@ export const DonorProvider = ({ children }) => {
             // Data should contain user info + token
             setUser(data);
             localStorage.setItem('donorx_user', JSON.stringify(data));
+            if (data._id) {
+                joinHospitalRoom(data._id);
+            }
             return { success: true };
         } catch (error) {
             console.error("Login failed", error);
@@ -55,6 +63,9 @@ export const DonorProvider = ({ children }) => {
             const { data } = await authService.register(userData);
             setUser(data);
             localStorage.setItem('donorx_user', JSON.stringify(data));
+            if (data._id) {
+                joinHospitalRoom(data._id);
+            }
             return { success: true };
         } catch (error) {
             return {
@@ -67,6 +78,7 @@ export const DonorProvider = ({ children }) => {
     const logout = () => {
         setUser(null);
         localStorage.removeItem('donorx_user');
+        disconnectSocket();
     };
 
     const updateProfile = (updatedDetails) => {

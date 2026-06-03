@@ -21,19 +21,40 @@ const NewRequest = () => {
         bloodGroup: '',
         bloodQty: 1,
         organType: 'Kidney',
-        organQty: 1
+        organQty: 1,
+        facilityType: 'ICU_BED',
+        facilityQty: 1,
     });
 
     const [selectedResources, setSelectedResources] = useState({
         blood: true,
-        organ: false
+        organ: false,
+        facility: false,
     });
+
+    const [clinicalSupport, setClinicalSupport] = useState(null);
+    const [showClinicalPanel, setShowClinicalPanel] = useState(false);
+
+    const RESOURCE_OPTIONS = [
+        { label: 'ICU Bed', value: 'ICU_BED' },
+        { label: 'Ventilator', value: 'VENTILATOR' },
+        { label: 'Oxygen Cylinder', value: 'OXYGEN_CYLINDER' },
+        { label: 'Ambulance', value: 'AMBULANCE' },
+    ];
+
+    const RISK_COLORS = {
+        Low: { bg: '#D1FAE5', color: '#065F46' },
+        Medium: { bg: '#FEF3C7', color: '#92400E' },
+        High: { bg: '#FFEDD5', color: '#9A3412' },
+        Critical: { bg: '#FEE2E2', color: '#991B1B' },
+    };
 
     // Map Simulation State
     const [isSimulating, setIsSimulating] = useState(false);
     const [simStatus, setSimStatus] = useState("Initializing geospatial network...");
     const [simDistance, setSimDistance] = useState("0 KM Radius");
     const [simLogs, setSimLogs] = useState(["> System ready..."]);
+    const [createdRequestId, setCreatedRequestId] = useState(null);
 
     // Voice assist state
     const [voiceTranscript, setVoiceTranscript] = useState('');
@@ -55,8 +76,8 @@ const NewRequest = () => {
             }
             return next;
         });
-        if (parsed.resourceType === 'blood') setSelectedResources({ blood: true, organ: false });
-        else if (parsed.resourceType === 'organ') setSelectedResources({ blood: false, organ: true });
+        if (parsed.resourceType === 'blood') setSelectedResources({ blood: true, organ: false, facility: false });
+        else if (parsed.resourceType === 'organ') setSelectedResources({ blood: false, organ: true, facility: false });
         setVoiceTranscript(rawTranscript);
         showToast('Voice captured – fields updated where possible.', 'success');
     };
@@ -93,8 +114,12 @@ const NewRequest = () => {
                     }
                     return next;
                 });
-                if (parsed.resourceType === 'blood') setSelectedResources({ blood: true, organ: false });
-                else if (parsed.resourceType === 'organ') setSelectedResources({ blood: false, organ: true });
+                if (parsed.resourceType === 'blood') setSelectedResources({ blood: true, organ: false, facility: false });
+                else if (parsed.resourceType === 'organ') setSelectedResources({ blood: false, organ: true, facility: false });
+                if (data.clinicalSupport) {
+                    setClinicalSupport(data.clinicalSupport);
+                    setShowClinicalPanel(true);
+                }
                 showToast('Report scanned – details suggested.', 'success');
             })
             .catch((error) => {
@@ -142,8 +167,12 @@ const NewRequest = () => {
         setStep(2);
     };
 
-    const toggleResource = (type) => {
-        setSelectedResources(prev => ({ ...prev, [type]: !prev[type] }));
+    const selectResourceCategory = (type) => {
+        setSelectedResources({
+            blood: type === 'blood',
+            organ: type === 'organ',
+            facility: type === 'facility',
+        });
     };
 
     const simulateAssist = (msg) => {
@@ -154,8 +183,8 @@ const NewRequest = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!selectedResources.blood && !selectedResources.organ) {
-            showToast('Please select at least one resource (Blood or Organ).', 'warning');
+        if (!selectedResources.blood && !selectedResources.organ && !selectedResources.facility) {
+            showToast('Please select Blood, Organ, or Resource.', 'warning');
             return;
         }
 
@@ -164,13 +193,13 @@ const NewRequest = () => {
             return;
         }
 
-        // Prepare Payload
         const resourceNeeded = {};
         if (selectedResources.blood) {
             if (!formData.bloodGroup) {
                 showToast('Please select a blood group.', 'warning');
                 return;
             }
+            resourceNeeded.resourceCategory = 'BLOOD';
             resourceNeeded.type = 'BLOOD';
             resourceNeeded.group = formData.bloodGroup;
             resourceNeeded.quantity = Number(formData.bloodQty) || 1;
@@ -179,11 +208,17 @@ const NewRequest = () => {
                 showToast('Please select an organ type.', 'warning');
                 return;
             }
+            resourceNeeded.resourceCategory = 'ORGAN';
             resourceNeeded.type = 'ORGAN';
             resourceNeeded.group = formData.organType;
             resourceNeeded.quantity = Number(formData.organQty) || 1;
+        } else if (selectedResources.facility) {
+            resourceNeeded.resourceCategory = 'RESOURCE';
+            resourceNeeded.type = formData.facilityType;
+            resourceNeeded.group = '';
+            resourceNeeded.quantity = Number(formData.facilityQty) || 1;
         } else {
-            showToast('Please select at least one resource (Blood or Organ).', 'warning');
+            showToast('Please select a resource type.', 'warning');
             return;
         }
 
@@ -217,8 +252,8 @@ const NewRequest = () => {
             
             // Only start simulation if request was successful
             if (response && response.status === 201) {
+                setCreatedRequestId(response.data._id);
                 showToast('Emergency request created successfully!', 'success');
-                // Start Visual Simulation
                 startSimulation();
             }
         } catch (error) {
@@ -324,17 +359,38 @@ const NewRequest = () => {
         }, 20);
     };
 
-    const showHospitals = (map) => {
+    const showHospitals = async (map) => {
         log("Broadcasting to nearby facilities...");
-        // Mock Hospitals relative to Center
         const centerLat = formData.location.lat || 13.0418;
         const centerLng = formData.location.lng || 80.2341;
 
-        const HOSPITALS = [
-            { name: "Apollo Hospitals", lat: centerLat + 0.02, lng: centerLng + 0.02 },
-            { name: "Fortis Malar", lat: centerLat - 0.03, lng: centerLng + 0.01 },
-            { name: "MIOT International", lat: centerLat + 0.01, lng: centerLng - 0.04 },
-        ];
+        let hospitals = [];
+
+        if (createdRequestId) {
+            try {
+                const { data } = await requestService.getById(createdRequestId);
+                if (data?.potentialMatches?.length > 0) {
+                    hospitals = data.potentialMatches
+                        .filter((h) => h.location?.coordinates?.length === 2)
+                        .map((h) => ({
+                            name: h.name,
+                            lat: h.location.coordinates[1],
+                            lng: h.location.coordinates[0],
+                        }));
+                }
+            } catch (err) {
+                console.warn('Failed to fetch matched hospitals, using mock data:', err);
+            }
+        }
+
+        if (hospitals.length === 0) {
+            console.warn('No matched hospitals from API — falling back to mock hospitals');
+            hospitals = [
+                { name: "Apollo Hospitals", lat: centerLat + 0.02, lng: centerLng + 0.02 },
+                { name: "Fortis Malar", lat: centerLat - 0.03, lng: centerLng + 0.01 },
+                { name: "MIOT International", lat: centerLat + 0.01, lng: centerLng - 0.04 },
+            ];
+        }
 
         const hospitalIcon = L.divIcon({
             className: 'custom-div-icon',
@@ -343,7 +399,7 @@ const NewRequest = () => {
             iconAnchor: [7, 7]
         });
 
-        HOSPITALS.forEach((h, i) => {
+        hospitals.forEach((h, i) => {
             setTimeout(() => {
                 L.marker([h.lat, h.lng], { icon: hospitalIcon }).addTo(map)
                     .bindPopup(`<b>${h.name}</b><br>Checking inventory...`);
@@ -465,6 +521,62 @@ const NewRequest = () => {
                         </button>
                     </div>
 
+                    {showClinicalPanel && clinicalSupport && (
+                        <div style={{
+                            marginBottom: '1rem',
+                            padding: '1rem 1.25rem',
+                            background: '#EEF2FF',
+                            border: '1px solid #C7D2FE',
+                            borderRadius: '10px',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                <div>
+                                    <strong>🤖 AI Clinical Support</strong>
+                                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6B7280' }}>
+                                        AI suggestion only — doctor must verify
+                                    </p>
+                                </div>
+                                <span style={{
+                                    padding: '0.2rem 0.6rem',
+                                    borderRadius: '999px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    ...(RISK_COLORS[clinicalSupport.riskLevel] || RISK_COLORS.Medium),
+                                }}>
+                                    {clinicalSupport.riskLevel}
+                                </span>
+                            </div>
+                            {clinicalSupport.possibleConditions?.length > 0 && (
+                                <div style={{ marginBottom: '0.75rem' }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>Possible Conditions:</div>
+                                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>
+                                        {clinicalSupport.possibleConditions.map((c, i) => <li key={i}>{c}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {clinicalSupport.recommendedTests?.length > 0 && (
+                                <div style={{ marginBottom: '0.75rem' }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>Recommended Tests:</div>
+                                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>
+                                        {clinicalSupport.recommendedTests.map((t, i) => <li key={i}>{t}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {clinicalSupport.clinicalNote && (
+                                <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', color: '#4B5563' }}>
+                                    <strong>Clinical Note:</strong> {clinicalSupport.clinicalNote}
+                                </p>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setShowClinicalPanel(false)}
+                                style={{ marginTop: '0.75rem', background: 'none', border: 'none', color: '#6366F1', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    )}
+
                     {(voiceTranscript || liveTranscript) && (
                         <div
                             style={{
@@ -540,19 +652,47 @@ const NewRequest = () => {
                         <div style={{ display: 'grid', gap: '1.5rem' }}>
                             <div style={{ display: 'grid', gap: '0.5rem' }}>
                                 <label style={{ fontWeight: 500 }}>What is needed?</label>
-                                <div className="flex gap-sm">
-                                    <label className={`resource-checkbox ${selectedResources.blood ? 'active' : ''}`} onClick={() => toggleResource('blood')}>
+                                <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
+                                    <label className={`resource-checkbox ${selectedResources.blood ? 'active' : ''}`} onClick={() => selectResourceCategory('blood')}>
                                         <div className={`custom-check ${selectedResources.blood ? 'checked' : ''}`} style={selectedResources.blood ? { background: '#FFF1F2', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' } : {}}>
                                             Blood
                                         </div>
                                     </label>
-                                    <label className={`resource-checkbox ${selectedResources.organ ? 'active' : ''}`} onClick={() => toggleResource('organ')}>
+                                    <label className={`resource-checkbox ${selectedResources.organ ? 'active' : ''}`} onClick={() => selectResourceCategory('organ')}>
                                         <div className={`custom-check ${selectedResources.organ ? 'checked' : ''}`} style={selectedResources.organ ? { background: '#FFF1F2', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' } : {}}>
                                             Organ
                                         </div>
                                     </label>
+                                    <label className={`resource-checkbox ${selectedResources.facility ? 'active' : ''}`} onClick={() => selectResourceCategory('facility')}>
+                                        <div className={`custom-check ${selectedResources.facility ? 'checked' : ''}`} style={selectedResources.facility ? { background: '#FFF1F2', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' } : {}}>
+                                            Resource
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
+
+                            {selectedResources.facility && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                        <label style={{ fontWeight: 500 }}>Resource Type</label>
+                                        <select
+                                            value={formData.facilityType}
+                                            onChange={e => updateForm('facilityType', e.target.value)}
+                                            style={{ padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'white' }}
+                                        >
+                                            {RESOURCE_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                        <label style={{ fontWeight: 500 }}>Quantity</label>
+                                        <input type="number" min="1" value={formData.facilityQty}
+                                            onChange={e => updateForm('facilityQty', e.target.value)}
+                                            style={{ padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }} />
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedResources.blood && (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

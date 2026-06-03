@@ -1,14 +1,18 @@
 const mongoose = require('mongoose');
 
 const ResourceSchema = new mongoose.Schema({
+    resourceCategory: {
+        type: String,
+        enum: ['BLOOD', 'ORGAN', 'RESOURCE'],
+        default: 'BLOOD',
+    },
     type: {
         type: String,
-        enum: ['BLOOD', 'ORGAN'],
-        required: true
+        required: true,
     },
     group: {
-        type: String, // e.g., 'A+', 'Kidney'
-        required: true
+        type: String,
+        default: '',
     },
     quantity: {
         type: Number,
@@ -74,6 +78,10 @@ const EmergencyRequestSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Hospital',
         default: null
+    },
+    aiSummary: {
+        type: String,
+        default: '',
     },
     createdAt: {
         type: Date,
